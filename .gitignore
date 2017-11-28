@@ -1,2 +1,5 @@
-sirlogsalot
+brimbot
 *.log.txt
+
+tags
+*.o
