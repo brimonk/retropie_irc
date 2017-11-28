@@ -1,4 +1,4 @@
-server = 195.154.200.232
+server = 71.11.84.232
 port = 6667
-nick = SirLogsalot
-channels = #WatchPeopleCode,#WatchCodeTest
+nick = BrimBot
+channels = ##pentest

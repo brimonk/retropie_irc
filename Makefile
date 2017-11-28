@@ -1,13 +1,19 @@
-compile:
-	clang -o sirlogsalot sirlogsalot.c
+CC = cc
+TARGET = brimbot
+OBJECTS = main.o
 
-run:
-	make compile
-	./sirlogsalot
+all: $(TARGET)
 
-clean:
-	rm sirlogsalot
+%.o: %.c
+	$(CC) -g -c -o $@ $<
 
-test:
-	make compile
-	valgrind ./sirlogsalot
+clean: clean-obj clean-bin
+
+clean-obj:
+	rm -rf *.o
+	
+clean-bin:
+	rm -rf $(TARGET)
+	
+$(TARGET): $(OBJECTS)
+	$(CC) -g -o $(TARGET) $(OBJECTS)
