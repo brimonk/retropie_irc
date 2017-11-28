@@ -1,3 +1,17 @@
+/*
+ * Brian Chrzanowski
+ * Tue Nov 28, 2017 00:03
+ *
+ * Modifications from sirlogsalot on github.
+ *
+ * TODO::
+ *
+ *		1. map of irc commands and their related functions. The 'main' loop
+ *		   becomes elegant with this and not a chain of if-else statements.
+ *		2. Implement regular retropie things.
+ *		3. Retry connecting if we weren't given a command to quit.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -5,6 +19,18 @@
 #include <time.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
+typedef struct cmd_t {
+	char *text;
+
+} cmd_t;
+
+typedef struct irc_inpt_t {
+	char *prefix;
+	char *username;
+	char *command;
+	char *argument;
+} irc_inpt_t;
 
 int read_line(int sock, char buffer[]){
     int length = 0;
