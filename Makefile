@@ -11,10 +11,10 @@ all: $(TARGET)
 clean: clean-obj clean-bin
 
 clean-obj:
-	rm -rf *.o
+	rm -f *.o
 	
 clean-bin:
-	rm -rf $(TARGET)
+	rm -f $(TARGET)
 	
 $(TARGET): $(OBJECTS)
 	$(CC) $(FLAGS) -o $(TARGET) $(OBJECTS)
