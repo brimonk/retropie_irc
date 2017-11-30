@@ -2,7 +2,24 @@
  * Brian Chrzanowski
  * Tue Nov 28, 2017 00:03
  *
- * Modifications from sirlogsalot on github.
+ * Major modifications from sirlogsalot on github.
+ *
+ * Main features:
+ *
+ *	- Retropie wiki loading features.
+ *	      !wiki  - searches the wiki for keys given as the second word
+ *	      !alias - searches the alias table, then returns through the value.
+ *	               if there is a wiki alias, the wiki search is performed,
+ *	               then completed.
+ *
+ *  - Administrators
+ *        !admin - presents a list of admins to the users
+ *
+ *  - BadConnection Kicker
+ *	      Automatically happens. 
+ *
+ *	- Pluggable Modules. Each irc command is loaded through a shared object.
+ *	  The Makefile compiles each module 
  *
  * TODO::
  *
@@ -10,6 +27,9 @@
  *		   becomes elegant with this and not a chain of if-else statements.
  *		2. Implement regular retropie things.
  *		3. Retry connecting if we weren't given a command to quit.
+ *		4. Implement irc modules. Should take in:
+ *		      parsed irc command structure
+ *		      irc message structure
  */
 
 #include <stdio.h>
@@ -20,19 +40,11 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-typedef struct cmd_t {
-	char *text;
+#include "irc.h"
+#include "data_types.h"
 
-} cmd_t;
-
-typedef struct irc_inpt_t {
-	char *prefix;
-	char *username;
-	char *command;
-	char *argument;
-} irc_inpt_t;
-
-int read_line(int sock, char buffer[]){
+int read_line(int sock, char buffer[])
+{
     int length = 0;
     while (1){
         char data;
@@ -50,7 +62,8 @@ int read_line(int sock, char buffer[]){
     }
 }
 
-void log_with_date(char line[]){
+void log_with_date(char line[])
+{
     char date[50];
     struct tm *current_time;
 
@@ -61,7 +74,8 @@ void log_with_date(char line[]){
     printf("[%s] %s\n", date, line);
 }
 
-void log_to_file(char line[], FILE *logfile){
+void log_to_file(char line[], FILE *logfile)
+{
     char date[50];
     struct tm *current_time;
 
@@ -95,7 +109,8 @@ char *get_config(char name[]){
     return value;
 }
 
-char *get_prefix(char line[]){
+char *get_prefix(char line[])
+{
     char *prefix = malloc(512);
     char clone[512];
     strncpy(clone, line, strlen(line)+1);
@@ -112,7 +127,8 @@ char *get_prefix(char line[]){
     return prefix;
 }
 
-char *get_username(char line[]){
+char *get_username(char line[])
+{
     char *username = malloc(512);
     char clone[512];
     strncpy(clone, line, strlen(line)+1);
@@ -129,7 +145,8 @@ char *get_username(char line[]){
     return username;
 }
 
-char *get_command(char line[]){
+char *get_command(char line[])
+{
     char *command = malloc(512);
     char clone[512];
     strncpy(clone, line, strlen(line)+1);
@@ -149,7 +166,8 @@ char *get_command(char line[]){
     return command;
 }
 
-char *get_last_argument(char line[]){
+char *get_last_argument(char line[])
+{
     char *argument = malloc(512);
     char clone[512];
     strncpy(clone, line, strlen(line)+1);
@@ -162,7 +180,8 @@ char *get_last_argument(char line[]){
     return argument;
 }
 
-char *get_argument(char line[], int argno){
+char *get_argument(char line[], int argno)
+{
     char *argument = malloc(512);
     char clone[512];
     strncpy(clone, line, strlen(line)+1);
@@ -186,37 +205,7 @@ char *get_argument(char line[], int argno){
     return argument;
 }
 
-void set_nick(int sock, char nick[]){
-    char nick_packet[512];
-    sprintf(nick_packet, "NICK %s\r\n", nick);
-    send(sock, nick_packet, strlen(nick_packet), 0);
-}
-
-void send_user_packet(int sock, char nick[]){
-    char user_packet[512];
-    sprintf(user_packet, "USER %s 0 * :%s\r\n", nick, nick);
-    send(sock, user_packet, strlen(user_packet), 0);
-}
-
-void join_channel(int sock, char channel[]){
-    char join_packet[512];
-    sprintf(join_packet, "JOIN %s\r\n", channel);
-    send(sock, join_packet, strlen(join_packet), 0);
-}
-
-void send_pong(int sock, char argument[]){
-    char pong_packet[512];
-    sprintf(pong_packet, "PONG :%s\r\n", argument);
-    send(sock, pong_packet, strlen(pong_packet), 0);
-}
-
-void send_message(int sock, char to[], char message[]){
-    char message_packet[512];
-    sprintf(message_packet, "PRIVMSG %s :%s\r\n", to, message);
-    send(sock, message_packet, strlen(message_packet), 0);
-}
-
-int main() {
+int main(int argc, char **argv) {
     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
     if (socket_desc == -1){
        perror("Could not create socket");
@@ -242,14 +231,14 @@ int main() {
     char *nick = get_config("nick");
     char *channels = get_config("channels");
 
-    set_nick(socket_desc, nick);
-    send_user_packet(socket_desc, nick);
-    join_channel(socket_desc, channels);
+    irc_set_nick(socket_desc, nick);
+    irc_send_user_packet(socket_desc, nick);
+    irc_join_channel(socket_desc, channels);
 
     free(nick);
     free(channels);
 
-    FILE *logfile = fopen("bot.log.txt", "a+");
+    FILE *logfile = fopen("log/bot.log.txt", "a+");
 
     while (1){
         char line[512];
@@ -261,7 +250,7 @@ int main() {
         char *argument = get_last_argument(line);
 
         if (strcmp(command, "PING") == 0){
-            send_pong(socket_desc, argument);
+            irc_send_pong(socket_desc, argument);
             log_with_date("Got ping. Replying with pong...");
         }else if (strcmp(command, "PRIVMSG") == 0){
             char logline[512];
