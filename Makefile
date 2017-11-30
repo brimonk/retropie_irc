@@ -1,7 +1,8 @@
 CC = cc
 FLAGS = -Wall -Werror -g
 TARGET = brimbot
-OBJECTS = main.o irc.o
+SOURCES = $(wildcard src/*.c)
+OBJECTS = $(SOURCES:.c=.o)
 
 all: $(TARGET)
 
@@ -11,7 +12,7 @@ all: $(TARGET)
 clean: clean-obj clean-bin
 
 clean-obj:
-	rm -f *.o
+	rm -f $(OBJECTS)
 	
 clean-bin:
 	rm -f $(TARGET)
