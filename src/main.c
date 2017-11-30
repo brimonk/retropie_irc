@@ -30,6 +30,10 @@
  *		4. Implement irc modules. Should take in:
  *		      parsed irc command structure
  *		      irc message structure
+ *		   and return
+ *		      cstr_t - to send over the socket
+ *		5. Change the config formula to become a sorted map, to allow for
+ *		   
  */
 
 #include <stdio.h>
@@ -40,8 +44,132 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include "irc.h"
 #include "data_types.h"
+#include "irc.h"
+#include "config.h"
+
+int read_line(int sock, char buffer[]);
+char *get_prefix(char line[]);
+char *get_username(char line[]);
+char *get_command(char line[]);
+char *get_last_argument(char line[]);
+char *get_argument(char line[], int argno);
+
+/* define our list of built in irc functions */
+cmd_t irc_cmd_list[] = {
+	{ "nick", IRC_SET_NICK, irc_set_nick }
+};
+
+int main(int argc, char **argv) {
+
+	/* define our array of cstrs */
+	int i;
+	cstr_t *str_ptr, str_list[5];
+	str_ptr = &str_list[0];
+
+	for (i = 0; i < 5; i++) {
+		str_list[i].buf = malloc(512);
+		if (str_list[i].buf) {
+			str_list[i].len = 512;
+			memset(str_list[i].buf, 0, 512);
+		}
+	}
+
+    int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_desc == -1){
+       perror("Could not create socket");
+       exit(1);
+    }
+    
+    char *ip = get_config("server");
+    char *port = get_config("port");
+
+    struct sockaddr_in server;
+    server.sin_addr.s_addr = inet_addr(ip);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(atoi(port));
+
+    free(ip);
+    free(port);
+
+    if (connect(socket_desc, (struct sockaddr *) &server, sizeof(server)) < 0){
+        perror("Could not connect");
+        exit(1);
+    }
+    
+    char *nick = get_config("nick");
+    char *channels = get_config("channels");
+
+	strncpy(str_list[0].buf, nick, 512);
+
+	/* just initializing the irc connection */
+    irc_set_nick(socket_desc, 5, &str_ptr);
+    irc_send_user_packet(socket_desc, 5, &str_ptr);
+
+	strncpy(str_list[0].buf, channels, 512);
+    irc_join_channel(socket_desc, 5, &str_ptr);
+
+    free(nick);
+    free(channels);
+
+    FILE *logfile = fopen("log/bot.log.txt", "a+");
+
+    while (1){
+        char line[512];
+        read_line(socket_desc, line);
+        
+        char *prefix = get_prefix(line);
+        char *username = get_username(line);
+        char *command = get_command(line);
+        char *argument = get_last_argument(line);
+
+        if (strcmp(command, "PING") == 0){
+			strncpy(str_list[0].buf, argument, 512);
+            irc_send_pong(socket_desc, 5, &str_ptr);
+            log_with_date("Got ping. Replying with pong...");
+        }else if (strcmp(command, "PRIVMSG") == 0){
+            char logline[512];
+            char *channel = get_argument(line, 1);
+
+            sprintf(logline, "%s/%s: %s", channel, username, argument);
+            log_with_date(logline);
+
+            char filename[500];
+            sprintf(filename, "%s.log.txt", channel);
+            freopen(filename, "a+", logfile);
+            log_to_file(logline, logfile);
+            free(channel);
+        }else if (strcmp(command, "JOIN") == 0){
+            char logline[512];
+            char *channel = get_argument(line, 1);
+            sprintf(logline, "%s joined %s.", username, channel);
+            log_with_date(logline);
+            
+            char filename[500];
+            sprintf(filename, "%s.log.txt", channel);
+            freopen(filename, "a+", logfile);
+            log_to_file(logline, logfile);
+            free(channel);
+        }else if (strcmp(command, "PART") == 0){
+            char logline[512];
+            char *channel = get_argument(line, 1);
+            sprintf(logline, "%s left %s.", username, channel);
+            log_with_date(logline);
+            
+            char filename[500];
+            sprintf(filename, "%s.log.txt", channel);
+            freopen(filename, "a+", logfile);
+            log_to_file(logline, logfile);
+            free(channel);
+        }
+
+        free(prefix);
+        free(username);
+        free(command);
+        free(argument);
+    }
+}
+
 
 int read_line(int sock, char buffer[])
 {
@@ -60,53 +188,6 @@ int read_line(int sock, char buffer[])
             return length;
         }
     }
-}
-
-void log_with_date(char line[])
-{
-    char date[50];
-    struct tm *current_time;
-
-    time_t now = time(0);
-    current_time = gmtime(&now);
-    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", current_time);
-
-    printf("[%s] %s\n", date, line);
-}
-
-void log_to_file(char line[], FILE *logfile)
-{
-    char date[50];
-    struct tm *current_time;
-
-    time_t now = time(0);
-    current_time = gmtime(&now);
-    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", current_time);
-
-    fprintf(logfile, "[%s] %s\n", date, line);
-    fflush(logfile);
-}
-
-char *get_config(char name[]){
-    char *value = malloc(1024);
-    FILE *configfile = fopen("config.txt", "r");
-    value[0] = '\0';
-    if (configfile != NULL){
-        while (1){
-            char configname[1024];
-            char tempvalue[1024];
-            int status = fscanf(configfile, " %1023[^= ] = %s ", configname, tempvalue); //Parse key=value
-            if (status == EOF){
-                break;
-            }
-            if (strcmp(configname, name) == 0){
-                strncpy(value, tempvalue, strlen(tempvalue)+1);
-                break;
-            }
-        }
-        fclose(configfile);
-    }
-    return value;
 }
 
 char *get_prefix(char line[])
@@ -203,94 +284,4 @@ char *get_argument(char line[], int argno)
         argument[0] = '\0';
     }
     return argument;
-}
-
-int main(int argc, char **argv) {
-    int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_desc == -1){
-       perror("Could not create socket");
-       exit(1);
-    }
-    
-    char *ip = get_config("server");
-    char *port = get_config("port");
-
-    struct sockaddr_in server;
-    server.sin_addr.s_addr = inet_addr(ip);
-    server.sin_family = AF_INET;
-    server.sin_port = htons(atoi(port));
-
-    free(ip);
-    free(port);
-
-    if (connect(socket_desc, (struct sockaddr *) &server, sizeof(server)) < 0){
-        perror("Could not connect");
-        exit(1);
-    }
-    
-    char *nick = get_config("nick");
-    char *channels = get_config("channels");
-
-    irc_set_nick(socket_desc, nick);
-    irc_send_user_packet(socket_desc, nick);
-    irc_join_channel(socket_desc, channels);
-
-    free(nick);
-    free(channels);
-
-    FILE *logfile = fopen("log/bot.log.txt", "a+");
-
-    while (1){
-        char line[512];
-        read_line(socket_desc, line);
-        
-        char *prefix = get_prefix(line);
-        char *username = get_username(line);
-        char *command = get_command(line);
-        char *argument = get_last_argument(line);
-
-        if (strcmp(command, "PING") == 0){
-            irc_send_pong(socket_desc, argument);
-            log_with_date("Got ping. Replying with pong...");
-        }else if (strcmp(command, "PRIVMSG") == 0){
-            char logline[512];
-            char *channel = get_argument(line, 1);
-
-            sprintf(logline, "%s/%s: %s", channel, username, argument);
-            log_with_date(logline);
-
-            char filename[500];
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        }else if (strcmp(command, "JOIN") == 0){
-            char logline[512];
-            char *channel = get_argument(line, 1);
-            sprintf(logline, "%s joined %s.", username, channel);
-            log_with_date(logline);
-            
-            char filename[500];
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        }else if (strcmp(command, "PART") == 0){
-            char logline[512];
-            char *channel = get_argument(line, 1);
-            sprintf(logline, "%s left %s.", username, channel);
-            log_with_date(logline);
-            
-            char filename[500];
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        }
-
-        free(prefix);
-        free(username);
-        free(command);
-        free(argument);
-    }
 }
