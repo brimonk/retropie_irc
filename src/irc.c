@@ -27,7 +27,7 @@ int irc_set_nick(int sock, int arrlen, cstr_t **out)
 	return (sendretval > 0) ? 1 : 0;
 }
 
-int irc_send_user_packet(int sock, int arrlen, cstr_t **out)
+int irc_send_user(int sock, int arrlen, cstr_t **out)
 {
     char user_packet[512];
 	int sendretval;

@@ -57,7 +57,11 @@ char *get_argument(char line[], int argno);
 
 /* define our list of built in irc functions */
 cmd_t irc_cmd_list[] = {
-	{ "nick", IRC_SET_NICK, irc_set_nick }
+	{ "NICK", irc_set_nick },
+	{ "USER", irc_send_user },
+	{ "JOIN", irc_join_channel },
+	{ "PONG", irc_send_pong },
+	{ "PRIVMSG", irc_set_nick }
 };
 
 int main(int argc, char **argv) {
@@ -104,7 +108,7 @@ int main(int argc, char **argv) {
 
 	/* just initializing the irc connection */
     irc_set_nick(socket_desc, 5, &str_ptr);
-    irc_send_user_packet(socket_desc, 5, &str_ptr);
+    irc_send_user(socket_desc, 5, &str_ptr);
 
 	strncpy(str_list[0].buf, channels, 512);
     irc_join_channel(socket_desc, 5, &str_ptr);
