@@ -54,6 +54,12 @@ char *get_username(char line[]);
 char *get_command(char line[]);
 char *get_last_argument(char line[]);
 char *get_argument(char line[], int argno);
+int cstr_init(cstr_t **ptr, int len, int buflen);
+
+#define BUFLEN 512
+
+/* have a global config pointer */
+config_t *config_ptr;
 
 /* define our list of built in irc functions */
 cmd_t irc_cmd_list[] = {
@@ -67,16 +73,12 @@ cmd_t irc_cmd_list[] = {
 int main(int argc, char **argv) {
 
 	/* define our array of cstrs */
-	int i;
-	cstr_t *str_ptr, str_list[5];
-	str_ptr = &str_list[0];
+	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
+	cstr_t *str_ptr;
 
-	for (i = 0; i < 5; i++) {
-		str_list[i].buf = malloc(512);
-		if (str_list[i].buf) {
-			str_list[i].len = 512;
-			memset(str_list[i].buf, 0, 512);
-		}
+	if (cstr_init(&str_ptr, 64, BUFLEN)) {
+		fprintf(stderr, "Not enough memory\n");
+		return 1;
 	}
 
     int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
@@ -104,13 +106,13 @@ int main(int argc, char **argv) {
     char *nick = get_config("nick");
     char *channels = get_config("channels");
 
-	strncpy(str_list[0].buf, nick, 512);
+	strncpy(str_ptr[0].buf, nick, 512);
 
 	/* just initializing the irc connection */
     irc_set_nick(socket_desc, 5, &str_ptr);
     irc_send_user(socket_desc, 5, &str_ptr);
 
-	strncpy(str_list[0].buf, channels, 512);
+	strncpy(str_ptr[0].buf, channels, 512);
     irc_join_channel(socket_desc, 5, &str_ptr);
 
     free(nick);
@@ -119,7 +121,7 @@ int main(int argc, char **argv) {
     FILE *logfile = fopen("log/bot.log.txt", "a+");
 
     while (1){
-        char line[512];
+		memset(line, 0, BUFLEN);
         read_line(socket_desc, line);
         
         char *prefix = get_prefix(line);
@@ -128,44 +130,40 @@ int main(int argc, char **argv) {
         char *argument = get_last_argument(line);
 
         if (strcmp(command, "PING") == 0){
-			strncpy(str_list[0].buf, argument, 512);
+			strncpy(str_ptr[0].buf, argument, 512);
             irc_send_pong(socket_desc, 5, &str_ptr);
             log_with_date("Got ping. Replying with pong...");
-        }else if (strcmp(command, "PRIVMSG") == 0){
-            char logline[512];
+        } else if (strcmp(command, "PRIVMSG") == 0){
             char *channel = get_argument(line, 1);
 
             sprintf(logline, "%s/%s: %s", channel, username, argument);
             log_with_date(logline);
 
-            char filename[500];
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
             log_to_file(logline, logfile);
             free(channel);
-        }else if (strcmp(command, "JOIN") == 0){
-            char logline[512];
+        } else if (strcmp(command, "JOIN") == 0){
             char *channel = get_argument(line, 1);
             sprintf(logline, "%s joined %s.", username, channel);
             log_with_date(logline);
             
-            char filename[500];
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
             log_to_file(logline, logfile);
             free(channel);
-        }else if (strcmp(command, "PART") == 0){
-            char logline[512];
+        } else if (strcmp(command, "PART") == 0){
             char *channel = get_argument(line, 1);
             sprintf(logline, "%s left %s.", username, channel);
             log_with_date(logline);
             
-            char filename[500];
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
             log_to_file(logline, logfile);
             free(channel);
         }
+
+		memset(logline, 0, BUFLEN);
 
         free(prefix);
         free(username);
@@ -289,3 +287,26 @@ char *get_argument(char line[], int argno)
     }
     return argument;
 }
+
+int cstr_init(cstr_t **ptr, int len, int buflen)
+{
+	int i, retval;
+
+	retval = 0;
+	*ptr = malloc(sizeof(cstr_t) * len);
+
+	if (*ptr) {
+		for (i = 0; i < len; i++) {
+			(*ptr)[i].len = buflen;
+			(*ptr)[i].buf = malloc(buflen);
+
+			if (!(*ptr)[i].buf) {
+				retval = 1;
+				break;
+			}
+		}
+	}
+
+	return retval;
+}
+

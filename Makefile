@@ -1,5 +1,5 @@
 CC = cc
-FLAGS = -Wall -g
+FLAGS = -Wall -g3
 TARGET = brimbot
 SOURCES = $(wildcard src/*.c)
 OBJECTS = $(SOURCES:.c=.o)
