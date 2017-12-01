@@ -3,3 +3,4 @@ brimbot
 
 tags
 *.o
+.gdb_history
