@@ -43,12 +43,13 @@
 #include <time.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <poll.h>
 
 #include "data_types.h"
 #include "irc.h"
 #include "config.h"
 
-int read_line(int sock, char buffer[]);
+int read_line(int sock, int n, char *buffer);
 char *get_prefix(char line[]);
 char *get_username(char line[]);
 char *get_command(char line[]);
@@ -73,6 +74,8 @@ cmd_t irc_cmd_list[] = {
 int main(int argc, char **argv) {
 
 	/* define our array of cstrs */
+	int tmp;
+	char ***linearr;
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
 	cstr_t *str_ptr;
 
@@ -120,76 +123,143 @@ int main(int argc, char **argv) {
 
     FILE *logfile = fopen("log/bot.log.txt", "a+");
 
-    while (1){
+	if (!logfile) {
+		fprintf(stderr, "Can't read file\n");
+		return 1;
+	}
+
+    while (1) {
 		memset(line, 0, BUFLEN);
-        read_line(socket_desc, line);
+        tmp = read_line(socket_desc, BUFLEN, line);
+
+		if (!tmp) {
+			continue;
+		}
+
+		/*
+		 * if we have bytes to read
+		 *   parse each line into a "message"
+		 *   iterate over the array of lines
+		 *
+		 *   parse each one
+		 *   log each line
+		 *   execute commands for each line where applicable
+		 */
+
+		tmp = parse_irc_lines(linearr, line, BUFLEN);
+		if (tmp) {
+		}
+
+		fprintf(logfile, "%s\n", line);
         
         char *prefix = get_prefix(line);
         char *username = get_username(line);
         char *command = get_command(line);
         char *argument = get_last_argument(line);
 
-        if (strcmp(command, "PING") == 0){
-			strncpy(str_ptr[0].buf, argument, 512);
-            irc_send_pong(socket_desc, 5, &str_ptr);
-            log_with_date("Got ping. Replying with pong...");
-        } else if (strcmp(command, "PRIVMSG") == 0){
-            char *channel = get_argument(line, 1);
+		printf("%s\n", line);
 
-            sprintf(logline, "%s/%s: %s", channel, username, argument);
-            log_with_date(logline);
+		fprintf(logfile, "\n\n");
+		fprintf(logfile, "prefix : %s\n", prefix);
+		fprintf(logfile, "username : %s\n", username);
+		fprintf(logfile, "command : %s\n", command);
+		fprintf(logfile, "argument : %s\n", argument);
 
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        } else if (strcmp(command, "JOIN") == 0){
-            char *channel = get_argument(line, 1);
-            sprintf(logline, "%s joined %s.", username, channel);
-            log_with_date(logline);
-            
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        } else if (strcmp(command, "PART") == 0){
-            char *channel = get_argument(line, 1);
-            sprintf(logline, "%s left %s.", username, channel);
-            log_with_date(logline);
-            
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        }
+        // if (strcmp(command, "PING") == 0){
+		// 	strncpy(str_ptr[0].buf, argument, 512);
+        //     irc_send_pong(socket_desc, 5, &str_ptr);
+        //     log_with_date("Got ping. Replying with pong...");
+        // } else if (strcmp(command, "PRIVMSG") == 0){
+        //     char *channel = get_argument(line, 1);
 
-		memset(logline, 0, BUFLEN);
+        //     sprintf(logline, "%s/%s: %s", channel, username, argument);
+        //     log_with_date(logline);
 
-        free(prefix);
-        free(username);
-        free(command);
-        free(argument);
+        //     sprintf(filename, "%s.log.txt", channel);
+        //     freopen(filename, "a+", logfile);
+        //     log_to_file(logline, logfile);
+        //     free(channel);
+        // } else if (strcmp(command, "JOIN") == 0){
+        //     char *channel = get_argument(line, 1);
+        //     sprintf(logline, "%s joined %s.", username, channel);
+        //     log_with_date(logline);
+        //     
+        //     sprintf(filename, "%s.log.txt", channel);
+        //     freopen(filename, "a+", logfile);
+        //     log_to_file(logline, logfile);
+        //     free(channel);
+        // } else if (strcmp(command, "PART") == 0){
+        //     char *channel = get_argument(line, 1);
+        //     sprintf(logline, "%s left %s.", username, channel);
+        //     log_with_date(logline);
+        //     
+        //     sprintf(filename, "%s.log.txt", channel);
+        //     freopen(filename, "a+", logfile);
+        //     log_to_file(logline, logfile);
+        //     free(channel);
+        // }
+
+		// memset(logline, 0, BUFLEN);
+
+        // free(prefix);
+        // free(username);
+        // free(command);
+        // free(argument);
     }
+
+	fclose(logfile);
 }
 
 
-int read_line(int sock, char buffer[])
+int read_line(int sock, int n, char *buffer)
 {
-    int length = 0;
-    while (1){
-        char data;
-        int result = recv(sock, &data, 1, 0);
-        if ((result <= 0) || (data == EOF)){
-            perror("Connection closed");
-            exit(1);
-        }
-        buffer[length] = data;
-        length++;
-        if (length >= 2 && buffer[length-2] == '\r' && buffer[length-1] == '\n'){
-            buffer[length-2] = '\0';
-            return length;
-        }
-    }
+	/* 
+	 * read at most n bytes from sock and store into buffer 
+	 * returns the number of bytes processed, or -1 on socket error
+	 */
+
+	int val, pollval;
+	struct pollfd poll_event = {0};
+
+	poll_event.fd = sock;
+	poll_event.events = POLLIN;
+	val = pollval = 0;
+
+	pollval = poll(&poll_event, 1, 15);
+
+	if (pollval) {
+		memset(buffer, 0, n);
+		val = recv(sock, buffer, n, 0);
+
+		if (val < 0) {
+			return val;
+		}
+
+		if (2 <= val && buffer[val - 2] == '\r' && buffer[val - 1] == '\n') {
+			buffer[val - 2] = '\0';
+		}
+
+		return val;
+	}
+
+	return val;
+}
+
+int parse_irc_lines(char ***dest, char *buf, int n)
+{
+	/* parse bytes provided by an irc server into an array of lines */
+	int i, newln_total;
+
+	newln_total = return_val = 0;
+
+	for (i = 0; i < n; i++) {
+		if (buf[i] == '\n') { /* irc provides \r\n, only count one of them */
+			newln_total++;
+			buf[i] = '\0';
+		}
+	}
+
+	return newln_total;
 }
 
 char *get_prefix(char line[])
