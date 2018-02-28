@@ -27,12 +27,7 @@
  *		   becomes elegant with this and not a chain of if-else statements.
  *		2. Implement regular retropie things.
  *		3. Retry connecting if we weren't given a command to quit.
- *		4. Implement irc modules. Should take in:
- *		      parsed irc command structure
- *		      irc message structure
- *		   and return
- *		      cstr_t - to send over the socket
- *		5. Change the config formula to become a sorted map, to allow for
+ *		4. Change the config formula to become a sorted map, to allow for
  *		   
  */
 
@@ -48,6 +43,7 @@
 #include <unistd.h>
 
 #include "data_types.h"
+#include "constants.h"
 #include "irc.h"
 #include "config.h"
 
@@ -61,10 +57,6 @@ char *get_argument(char line[], int argno);
 int cstr_init(cstr_t **ptr, int len, int buflen);
 void cstr_clean(cstr_t **ptr, int num);
 
-#define BUFLEN 512
-
-/* have a global config pointer */
-config_t *config_ptr;
 
 /* define our list of built in irc functions */
 irc_cmd_t irc_cmd_list[] = {
@@ -85,13 +77,21 @@ static void sock_close(int signo)
 int main(int argc, char **argv) {
 
 	/* define our array of cstrs */
-	int tmp;
+	int config_items, tmp;
 	char ***linearr = {0};
+	char *config_name = "config.txt";
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
+	str_dict_t *config_ptr;
 	cstr_t *str_ptr;
 
 	if (signal(SIGTERM, sock_close) == SIG_ERR) {
 		fprintf(stderr, "Error occurred while setting signal handler\n");
+		return 1;
+	}
+
+	if ((config_items = config_load(&config_ptr, 64, config_name)) < 0) {
+		/* if config_load returns -1, we had some issues */
+		fprintf(stderr, "Config loading couldn't complete properly\n");
 		return 1;
 	}
 
@@ -106,25 +106,23 @@ int main(int argc, char **argv) {
        exit(1);
     }
 	socket_ptr = &socket_desc;
-    
-    char *ip = get_config("server");
-    char *port = get_config("port");
+
+	/* initialize the specific things we need from the config */
+    char *ip = get_config(config_ptr, config_items, "server");
+    char *nick = get_config(config_ptr, config_items, "nick");
+    char *channels = get_config(config_ptr, config_items, "channels");
+    char *port = get_config(config_ptr, config_items, "port");
 
     struct sockaddr_in server;
     server.sin_addr.s_addr = inet_addr(ip);
     server.sin_family = AF_INET;
     server.sin_port = htons(atoi(port));
 
-    free(ip);
-    free(port);
-
     if (connect(socket_desc, (struct sockaddr *) &server, sizeof(server)) < 0){
         perror("Could not connect");
         exit(1);
     }
     
-    char *nick = get_config("nick");
-    char *channels = get_config("channels");
 
 	strncpy(str_ptr[0].buf, nick, BUFLEN);
 
@@ -134,9 +132,6 @@ int main(int argc, char **argv) {
 
 	strncpy(str_ptr[0].buf, channels, BUFLEN);
     irc_join_channel(socket_desc, 5, &str_ptr);
-
-    free(nick);
-    free(channels);
 
     FILE *logfile = fopen("log/bot.log.txt", "a+");
 
@@ -178,9 +173,20 @@ int main(int argc, char **argv) {
             log_with_date("Got ping. Replying with pong...");
         } else if (strcmp(command, "PRIVMSG") == 0){
             char *channel = get_argument(line, 1);
+			char *buf = malloc(BUFLEN);
+
+			if (!buf) {
+				fprintf(stderr, "memory error\n");
+				return 1;
+			}
 
             sprintf(logline, "%s/%s: %s", channel, username, argument);
             log_with_date(logline);
+
+			/* 
+			 * check if there's a message to respond to by iterating over
+			 * the list of text->func_ptrs.
+			 */
 
 			strncpy(str_ptr[0].buf, channel, BUFLEN);
 			strncpy(str_ptr[1].buf, "Hello", BUFLEN);

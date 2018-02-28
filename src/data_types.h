@@ -5,10 +5,10 @@ typedef struct cstr_t {
 	int len;
 } cstr_t;
 
-typedef struct config_t {
+typedef struct str_dict_t {
 	char *key;
 	char *value;
-} config_t;
+} str_dict_t;
 
 /* 
  * every irc function takes in an input * and output * structure, while

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "data_types.h"
+#include "constants.h"
 
 void log_with_date(char line[])
 {
@@ -28,25 +30,70 @@ void log_to_file(char line[], FILE *logfile)
     fflush(logfile);
 }
 
-char *get_config(char name[])
+char *get_config(str_dict_t *ptr, int len, char *key)
 {
-    char *value = malloc(1024);
-    FILE *configfile = fopen("config.txt", "r");
-    value[0] = '\0';
-    if (configfile != NULL){
-        while (1){
-            char configname[1024];
-            char tempvalue[1024];
-            int status = fscanf(configfile, " %1023[^= ] = %s ", configname, tempvalue); //Parse key=value
-            if (status == EOF){
-                break;
-            }
-            if (strcmp(configname, name) == 0){
-                strncpy(value, tempvalue, strlen(tempvalue)+1);
-                break;
-            }
+	/* 
+	 * retrieves config value pointer for input key
+	 * DO NOT FREE
+	 */
+
+	int i, j;
+
+	j = strlen(key);
+	for (i = 0; i < len; i++) {
+		if (strncmp(ptr[i].key, key, j) == 0) {
+			return ptr[i].value;
+		}
+	}
+
+	return NULL;
+}
+
+int config_load(str_dict_t **ptr, int len, char *file_name)
+{
+	/* 
+	 * generalized function to load only len items (lines) from a config file
+	 * returns non-zero on error
+	 *
+	 * WARNING
+	 *	if the config file has blank lines, this breaks. Some more logic needs
+	 *	to be added to check if the line actually has what we're 
+	 *	trying to parse
+	 */
+
+	int i;
+	char buf[BUFLEN];
+
+	*ptr = malloc(sizeof(str_dict_t) * len);
+
+	if (!*ptr) {
+		return -1;
+	}
+ 
+	memset(&buf[0], 0, BUFLEN);
+
+    FILE *fptr = fopen("config.txt", "r");
+
+    if (fptr) {
+		for (i = 0; i < len && fgets(buf, BUFLEN, fptr) == &buf[0]; i++) {
+			/* get space for key and value (wastefully) */
+			(*ptr)[i].key   = malloc(BUFLEN);
+			(*ptr)[i].value = malloc(BUFLEN);
+
+			if (!((*ptr)[i].key && (*ptr)[i].value)) {
+				return -1;
+			}
+
+			/* parse the values from buffer into (*ptr)[i].key && value */
+			sscanf(buf, "%511s = %511s ",
+					(*ptr)[i].key,
+					(*ptr)[i].value);
         }
-        fclose(configfile);
-    }
-    return value;
+
+        fclose(fptr);
+    } else {
+		return -1;
+	}
+
+	return i;
 }
