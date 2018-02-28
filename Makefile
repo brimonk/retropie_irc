@@ -7,7 +7,7 @@ OBJECTS = $(SOURCES:.c=.o)
 
 LIB_FLAGS = -shared -fPIC
 LIB_SOURCES = $(wildcard src/lib/*.c)
-LIB_OBJECTS = $(LIB_SOURCES:.c=.o)
+LIB_OBJECTS = $(LIB_SOURCES:.c=.so)
 
 all: $(TARGET)
 
@@ -20,7 +20,8 @@ src/lib/%.so: src/lib/%.c # rule to compile each $(LIB) by itself
 clean: clean-obj clean-bin
 
 clean-obj:
-	rm -f $(OBJECTS) $(LIB_OBJECTS)
+	rm -f $(OBJECTS)
+	rm -f $(LIB_OBJECTS)
 	
 clean-bin:
 	rm -f $(TARGET)
