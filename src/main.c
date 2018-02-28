@@ -67,7 +67,7 @@ void cstr_clean(cstr_t **ptr, int num);
 config_t *config_ptr;
 
 /* define our list of built in irc functions */
-cmd_t irc_cmd_list[] = {
+irc_cmd_t irc_cmd_list[] = {
 	{ "NICK", irc_set_nick },
 	{ "USER", irc_send_user },
 	{ "JOIN", irc_join_channel },

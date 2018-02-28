@@ -4,7 +4,7 @@
  * Because this is the first, "testing" module, I'm setting up specific
  * conventions here.
  *
- * input to the entry() function
+ * the input for command - response 
  *
  *		dest		- destination where reponse string is stored
  *		dest_size	- max length of buffer you can write in. YOUR FAULT IF
@@ -27,6 +27,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "../data_types.h"
+
+// __attribute__((__visibility__("default")))
+// char const* const entry_command = "!hello";
 
 char *entry_command = "!hello";
 
@@ -35,10 +39,10 @@ int entry(char *dest, int dest_size, cstr_t **in)
 {
 	int returnval;
 	char *channel, *user, *command, *input;
-	channel = (*out)[0].buf;
-	user    = (*out)[1].buf;
-	command = (*out)[2].buf;
-	input   = (*out)[3].buf;
+	channel = (*in)[0].buf;
+	user    = (*in)[1].buf;
+	command = (*in)[2].buf;
+	input   = (*in)[3].buf;
 	returnval = 0;
 
 	printf("%s\n", channel);

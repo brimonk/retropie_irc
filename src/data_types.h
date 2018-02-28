@@ -21,8 +21,22 @@ typedef struct config_t {
  * we might eventually add an indicator to show if a user needs to be an admin
  * to run the command
  */
-typedef struct cmd_t {
+typedef struct irc_cmd_t {
 	char *text;
 	int (*funcptr)(int, int, cstr_t **);
-} cmd_t;
+} irc_cmd_t;
+
+
+enum { IRC_TYPE_CALLRESPONSE, IRC_TYPE_RESPONSE };
+typedef struct lib_cmd_t {
+	char *text;
+	int (*funcptr)(char *, int, cstr_t **);
+	int type; /* where type is any enum of the IRC_TYPE_* */
+} lib_cmd_t;
+
+enum { IRC_RETURN_OK,
+	   IRC_RETURN_NOMEM,
+	   IRC_RETURN_BADPERM,
+	   IRC_RETURN_CMDNOSUPPORT
+};
 
