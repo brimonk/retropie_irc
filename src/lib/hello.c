@@ -4,6 +4,16 @@
  * Because this is the first, "testing" module, I'm setting up specific
  * conventions here.
  *
+ * There are also two included functions, which when someone uses a !hello
+ * command, the bot will say hello back to them: hello(), and another command
+ * someone can use as an example of an "in context reply", which will allow
+ * for a line's state to be checked. IE, a line is entirely upper case,
+ * yell at them for writing in all upper case.
+ *
+ *
+ *
+ * each shared object must contain an "entry_dict"
+ *
  * the input for command - response 
  *
  *		dest		- destination where reponse string is stored
@@ -17,45 +27,47 @@
  *								 you represent
  *					  (*in)[3] - the rest of their input text
  *
- * return values
- *		-1			- memory error of some sort
- *		0			- no issues
- *		1			- permissions issue
- *		2			- innappropriate command
+ *					  IE
+ *						channel = (*in)[0].buf;
+ * 						user    = (*in)[1].buf;
+ * 						command = (*in)[2].buf;
+ * 						input   = (*in)[3].buf;
+ *
+ * return values, defined in ../data_types.h
+ *		IRC_RETURN_OK		- everything is a-ok
+ *		IRC_RETURN_NOOUT	- the command executed, but didn't have any output
+ *		IRC_RETURN_NOMEM	- not enough memory (malloc fail)
+ *		IRC_RETURN_BADPERM	- the passed in user doesn't have permission for
+ *							  this function
+ *		IRC_RETURN_CMDNOSUPPORT
+ *							- this library doesn't support this command
  */
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "../data_types.h"
 
-// __attribute__((__visibility__("default")))
-// char const* const entry_command = "!hello";
+int hello(char *dest, int dest_size, cstr_t **in);
+int no_all_caps(char *dest, int dest_size, cstr_t **in);
 
-char *entry_command = "!hello";
+lib_cmd_t entry_dict[] = {
+	{"!hello", hello, IRC_TYPE_CALLRESPONSE},
+	{"", no_all_caps, IRC_TYPE_RESPONSE}
+};
 
 /* therefore, a nice entry function might be formatted like this */
-int entry(char *dest, int dest_size, cstr_t **in)
+int hello(char *dest, int dest_size, cstr_t **in)
 {
 	int returnval;
-	char *channel, *user, *command, *input;
-	channel = (*in)[0].buf;
-	user    = (*in)[1].buf;
-	command = (*in)[2].buf;
-	input   = (*in)[3].buf;
-	returnval = 0;
+	char *user;
 
-	printf("%s\n", channel);
-	printf("%s\n", user);
-	printf("%s\n", command);
-	printf("%s\n", input);
+	user = (*in)[1].buf;
+	returnval = 0;
 
 	if (!dest) {
 		return -1;
-	}
-
-	if (strncmp(command, entry_command, strlen(entry_command)) != 0) {
-		return 2;
 	}
 
 	strncpy(dest, "Hello, ", dest_size - strlen(dest));
@@ -63,3 +75,36 @@ int entry(char *dest, int dest_size, cstr_t **in)
 
 	return returnval;
 }
+
+int no_all_caps(char *dest, int dest_size, cstr_t **in)
+{
+	/* just a function to check if each byte in the message is uppercase */
+
+	/* boilerplate */
+	int returnval, i, upperstatus;
+	char *user, *input;
+	char *message = "%s, please don't write in all caps. IT'S REALLY ANNOYING.";
+
+	user  = (*in)[1].buf;
+	input = (*in)[3].buf;
+
+	for (i = 0, upperstatus = 1; i < strlen(dest); i++) {
+		if (islower(input + i)) {
+			upperstatus = 0;
+			break;
+		}
+	}
+
+	/* check if we have enough space */
+	if (upperstatus) {
+		if (dest_size < strlen(message) - 2 + strlen(user)) {
+			returnval = IRC_RETURN_NOMEM;
+		} else {
+			sprintf(dest, message, user);
+			returnval = IRC_RETURN_OK;
+		}
+	}
+
+	return returnval;
+}
+

@@ -27,16 +27,22 @@ typedef struct irc_cmd_t {
 } irc_cmd_t;
 
 
-enum { IRC_TYPE_CALLRESPONSE, IRC_TYPE_RESPONSE };
 typedef struct lib_cmd_t {
 	char *text;
 	int (*funcptr)(char *, int, cstr_t **);
 	int type; /* where type is any enum of the IRC_TYPE_* */
 } lib_cmd_t;
 
-enum { IRC_RETURN_OK,
-	   IRC_RETURN_NOMEM,
-	   IRC_RETURN_BADPERM,
-	   IRC_RETURN_CMDNOSUPPORT
+enum { /* type of IRC command */
+	IRC_TYPE_CALLRESPONSE,
+	IRC_TYPE_RESPONSE
+};
+
+enum { /* return value to return to caller */
+	IRC_RETURN_OK				= 0x00,
+	IRC_RETURN_NOOUT			= 0x01,
+	IRC_RETURN_NOMEM			= 0x02,
+	IRC_RETURN_BADPERM			= 0x04,
+	IRC_RETURN_CMDNOSUPPORT		= 0x08
 };
 
