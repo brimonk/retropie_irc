@@ -47,6 +47,10 @@
 #include "irc.h"
 #include "config.h"
 
+int mk_socket(str_dict_t *config_ptr, int config_items);
+int cstr_init(cstr_t **ptr, int len, int buflen);
+void cstr_clean(cstr_t **ptr, int num);
+
 int read_line(int sock, int n, char *buffer);
 int parse_irc_lines(char ***dest, char *buf, int n);
 char *get_prefix(char line[]);
@@ -54,8 +58,6 @@ char *get_username(char line[]);
 char *get_command(char line[]);
 char *get_last_argument(char line[]);
 char *get_argument(char line[], int argno);
-int cstr_init(cstr_t **ptr, int len, int buflen);
-void cstr_clean(cstr_t **ptr, int num);
 
 
 /* define our list of built in irc functions */
@@ -77,7 +79,7 @@ static void sock_close(int signo)
 int main(int argc, char **argv) {
 
 	/* define our array of cstrs */
-	int config_items, tmp;
+	int config_items, tmp, socket_desc;
 	char ***linearr = {0};
 	char *config_name = "config.txt";
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
@@ -100,29 +102,10 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-    int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
-    if (socket_desc == -1){
-       perror("Could not create socket");
-       exit(1);
-    }
-	socket_ptr = &socket_desc;
+	socket_desc = mk_socket(config_ptr, config_items);
 
-	/* initialize the specific things we need from the config */
-    char *ip = get_config(config_ptr, config_items, "server");
     char *nick = get_config(config_ptr, config_items, "nick");
     char *channels = get_config(config_ptr, config_items, "channels");
-    char *port = get_config(config_ptr, config_items, "port");
-
-    struct sockaddr_in server;
-    server.sin_addr.s_addr = inet_addr(ip);
-    server.sin_family = AF_INET;
-    server.sin_port = htons(atoi(port));
-
-    if (connect(socket_desc, (struct sockaddr *) &server, sizeof(server)) < 0){
-        perror("Could not connect");
-        exit(1);
-    }
-    
 
 	strncpy(str_ptr[0].buf, nick, BUFLEN);
 
@@ -140,7 +123,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-    while (1) {
+    for (;;) {
 		memset(line, 0, BUFLEN);
         tmp = read_line(socket_desc, BUFLEN, line);
 
@@ -422,3 +405,28 @@ void cstr_clean(cstr_t **ptr, int num)
 	}
 }
 
+
+int mk_socket(str_dict_t *config_ptr, int config_items)
+{
+    int socket_desc = socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_desc == -1){
+       perror("Could not create socket");
+       exit(1);
+    }
+
+	/* initialize the specific things we need from the config */
+    char *ip = get_config(config_ptr, config_items, "server");
+    char *port = get_config(config_ptr, config_items, "port");
+
+    struct sockaddr_in server;
+    server.sin_addr.s_addr = inet_addr(ip);
+    server.sin_family = AF_INET;
+    server.sin_port = htons(atoi(port));
+
+    if (connect(socket_desc, (struct sockaddr *) &server, sizeof(server)) < 0){
+        perror("Could not connect");
+        exit(1);
+    }
+
+	return socket_desc;
+}
