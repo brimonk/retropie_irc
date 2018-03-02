@@ -54,7 +54,8 @@ int no_all_caps(char *dest, int dest_size, cstr_t **in);
 
 lib_cmd_t entry_dict[] = {
 	{"!hello", hello, IRC_TYPE_CALLRESPONSE},
-	{"", no_all_caps, IRC_TYPE_RESPONSE}
+	{"", no_all_caps, IRC_TYPE_RESPONSE},
+	{NULL, 0, 0} /* signifies no more entries */
 };
 
 /* therefore, a nice entry function might be formatted like this */
