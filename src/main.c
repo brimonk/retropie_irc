@@ -27,8 +27,6 @@
  *		   becomes elegant with this and not a chain of if-else statements.
  *		2. Implement regular retropie things.
  *		3. Retry connecting if we weren't given a command to quit.
- *		4. Change the config formula to become a sorted map, to allow for
- *		   
  */
 
 #include <stdio.h>
@@ -44,6 +42,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 #include "data_types.h"
 #include "constants.h"
@@ -55,6 +54,8 @@
 int mk_socket(str_dict_t *config_ptr, int config_items);
 int cstr_init(cstr_t **ptr, int len, int buflen);
 void cstr_clean(cstr_t **ptr, int num);
+int load_irc_lib(char *lib_dir, lib_cmd_t **ptr);
+int load_lib(lib_cmd_t **ptr, int n, char *filename);
 
 void error_and_exit(char *s);
 
@@ -66,7 +67,6 @@ char *get_username(char line[]);
 char *get_command(char line[]);
 char *get_last_argument(char line[]);
 char *get_argument(char line[], int argno);
-int load_irc_lib(char *lib_dir, lib_cmd_t **ptr);
 
 
 /* define our list of built in irc functions */
@@ -408,18 +408,36 @@ char *get_argument(char line[], int argno)
 
 int load_irc_lib(char *lib_dir, lib_cmd_t **ptr)
 {
-	/* spin through lib_dir, loading each *.so into the ptr list */
+	/* 
+	 * spin through lib_dir, loading each *.so into the ptr list 
+	 * returns number of lib_cmd_ts we fully loaded
+	 */
+
 	DIR *dirptr;
 	struct dirent *dir_struct;
 	char *dot_ptr;
 	int returnval;
+	char buf[BUFLEN];
 
 	dirptr = opendir(lib_dir);
 	returnval = 0;
 
 	if (dirptr) {
 		while ((dir_struct = readdir(dirptr)) != NULL) {
-			printf("%s\n", dir_struct->d_name);
+			dot_ptr = strrchr(dir_struct->d_name, '.');
+
+			if (strncmp(dot_ptr, ".so", 3) == 0) {
+				/* load into our *ptr, providing a full path */
+				memset(buf, 0, BUFLEN);
+
+				strcat(buf, lib_dir); /* prepare for dlopen */
+				strcat(buf, "/./");
+				strcat(buf, dir_struct->d_name);
+
+				printf("%s\n", buf);
+
+				returnval += load_lib(ptr, returnval, buf);
+			}
 		}
 
 		closedir(dirptr);
@@ -429,6 +447,35 @@ int load_irc_lib(char *lib_dir, lib_cmd_t **ptr)
 	}
 
 	return returnval;
+}
+
+int load_lib(lib_cmd_t **ptr, int n, char *filename)
+{
+	void *objhandle;
+	lib_cmd_t *dicthandle;
+	int i = 0, val = 0;
+	char *error, *text;
+
+	/* begin by loading objhandle with the shared object handle */
+	objhandle = dlopen(filename, RTLD_NOW);
+
+	if (!objhandle) {
+		error_and_exit(dlerror());
+	}
+
+	/* now load the table each shared object must have */
+	*(void **) (&dicthandle) = dlsym(objhandle, "entry_dict");
+	error = dlerror();
+	if (error != NULL) {
+		error_and_exit(error);
+	}
+
+	/* iterate through the table, loading each function into ptr */
+	for (i = 0; (text = dicthandle[i].text) != NULL; i++) {
+		printf("%s\n", text);
+	}
+
+	return val;
 }
 
 int cstr_init(cstr_t **ptr, int len, int buflen)
