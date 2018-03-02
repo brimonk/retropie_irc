@@ -1,6 +1,7 @@
 CC = cc
 FLAGS = -Wall
 DEBUG = -gdwarf
+LINKER = -ldl
 TARGET = brimbot
 SOURCES = $(wildcard src/*.c)
 OBJECTS = $(SOURCES:.c=.o)
@@ -27,5 +28,5 @@ clean-bin:
 	rm -f $(TARGET)
 	
 $(TARGET): $(OBJECTS) | $(LIB_OBJECTS)
-	$(CC) $(DEBUG) $(FLAGS) -o $(TARGET) $(OBJECTS)
+	$(CC) $(DEBUG) $(FLAGS) -o $(TARGET) $(OBJECTS) $(LINKER)
 
