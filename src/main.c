@@ -59,6 +59,7 @@ void cstr_clean(cstr_t **ptr, int num);
 void error_and_exit(char *s);
 
 int read_line(int sock, int n, char *buffer);
+int read_line_nonblock(int sock, int n, char *buffer);
 int parse_irc_lines(char ***dest, char *buf, int n);
 char *get_prefix(char line[]);
 char *get_username(char line[]);
@@ -213,17 +214,38 @@ int main(int argc, char **argv) {
 
 		memset(logline, 0, BUFLEN);
 
-        free(prefix);
-        free(username);
-        free(command);
-        free(argument);
+		if (prefix) { free(prefix); }
+        if (username) { free(username); }
+        if (command) { free(command); }
+        if (argument) { free(argument); }
     }
 
 	fclose(logfile);
 }
 
+int read_line(int sock, int n, char *buffer) {
+    size_t length = 0;
 
-int read_line(int sock, int n, char *buffer)
+    while (1) {
+        char data;
+        int result = recv(sock, &data, 1, 0);
+
+        if ((result <= 0) || (data == EOF)){
+            perror("Connection closed");
+            exit(1);
+        }
+
+        buffer[length] = data;
+        length++;
+        
+        if (length >= 2 && buffer[length-2] == '\r' && buffer[length-1] == '\n') {
+            buffer[length-2] = '\0';
+            return length;
+        }
+    }
+}
+
+int read_line_nonblock(int sock, int n, char *buffer)
 {
 	/* 
 	 * read at most n bytes from sock and store into buffer 
@@ -324,6 +346,11 @@ char *get_command(char line[])
     char clone[512];
     strncpy(clone, line, strlen(line)+1);
     char *splitted = strtok(clone, " ");
+
+	if (!command) {
+		return NULL;
+	}
+
     if (splitted != NULL){
         if (splitted[0] == ':'){
             splitted = strtok(NULL, " ");
@@ -336,6 +363,7 @@ char *get_command(char line[])
     }else{
         command[0] = '\0';
     }
+
     return command;
 }
 
