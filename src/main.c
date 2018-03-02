@@ -36,10 +36,13 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
-#include <sys/socket.h>
+
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <poll.h>
 #include <signal.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "data_types.h"
@@ -47,9 +50,13 @@
 #include "irc.h"
 #include "config.h"
 
+#define LIBRARY_DIR "./src/lib"
+
 int mk_socket(str_dict_t *config_ptr, int config_items);
 int cstr_init(cstr_t **ptr, int len, int buflen);
 void cstr_clean(cstr_t **ptr, int num);
+
+void error_and_exit(char *s);
 
 int read_line(int sock, int n, char *buffer);
 int parse_irc_lines(char ***dest, char *buf, int n);
@@ -58,6 +65,7 @@ char *get_username(char line[]);
 char *get_command(char line[]);
 char *get_last_argument(char line[]);
 char *get_argument(char line[], int argno);
+int load_irc_lib(char *lib_dir, lib_cmd_t **ptr);
 
 
 /* define our list of built in irc functions */
@@ -79,28 +87,28 @@ static void sock_close(int signo)
 int main(int argc, char **argv) {
 
 	/* define our array of cstrs */
-	int config_items, tmp, socket_desc;
-	char ***linearr = {0};
+	int config_items, tmp, socket_desc, lib_funcs;
 	char *config_name = "config.txt";
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
+	lib_cmd_t *lib_ptr;
 	str_dict_t *config_ptr;
 	cstr_t *str_ptr;
 
 	if (signal(SIGTERM, sock_close) == SIG_ERR) {
-		fprintf(stderr, "Error occurred while setting signal handler\n");
-		return 1;
+		error_and_exit("Error occurred while setting signal handler");
 	}
 
 	if ((config_items = config_load(&config_ptr, 64, config_name)) < 0) {
 		/* if config_load returns -1, we had some issues */
-		fprintf(stderr, "Config loading couldn't complete properly\n");
-		return 1;
+		error_and_exit("Config loading couldn't complete properly");
 	}
 
 	if (cstr_init(&str_ptr, 64, BUFLEN)) {
-		fprintf(stderr, "Not enough memory\n");
-		return 1;
+		error_and_exit("Not enough memory");
 	}
+
+	/* before an irc connection, we load up our shared object functionality */
+	lib_funcs = load_irc_lib(LIBRARY_DIR, &lib_ptr);
 
 	socket_desc = mk_socket(config_ptr, config_items);
 
@@ -140,8 +148,6 @@ int main(int argc, char **argv) {
 		 *   log each line
 		 *   execute commands for each line where applicable
 		 */
-
-		tmp = parse_irc_lines(linearr, line, BUFLEN);
 
 		fprintf(logfile, "%s\n", line);
         
@@ -372,6 +378,31 @@ char *get_argument(char line[], int argno)
     return argument;
 }
 
+int load_irc_lib(char *lib_dir, lib_cmd_t **ptr)
+{
+	/* spin through lib_dir, loading each *.so into the ptr list */
+	DIR *dirptr;
+	struct dirent *dir_struct;
+	char *dot_ptr;
+	int returnval;
+
+	dirptr = opendir(lib_dir);
+	returnval = 0;
+
+	if (dirptr) {
+		while ((dir_struct = readdir(dirptr)) != NULL) {
+			printf("%s\n", dir_struct->d_name);
+		}
+
+		closedir(dirptr);
+	} else {
+		printf("Couldn't open '%s'\n", lib_dir);
+		returnval = -1;
+	}
+
+	return returnval;
+}
+
 int cstr_init(cstr_t **ptr, int len, int buflen)
 {
 	int i, retval;
@@ -429,4 +460,10 @@ int mk_socket(str_dict_t *config_ptr, int config_items)
     }
 
 	return socket_desc;
+}
+
+void error_and_exit(char *s)
+{
+	fprintf(stderr, "%s\n", s);
+	exit(EXIT_FAILURE);
 }
