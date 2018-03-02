@@ -6,7 +6,7 @@ TARGET = brimbot
 SOURCES = $(wildcard src/*.c)
 OBJECTS = $(SOURCES:.c=.o)
 
-LIB_FLAGS = -shared -fPIC
+LIB_FLAGS = -shared -fPIC -rdynamic -ldl
 LIB_SOURCES = $(wildcard src/lib/*.c)
 LIB_OBJECTS = $(LIB_SOURCES:.c=.so)
 
@@ -16,7 +16,7 @@ src/%.o: src/%.c # rule to compile each $(TARGET) object
 	$(CC) -c $(DEBUG) $(FLAGS) -o $@ $<
 
 src/lib/%.so: src/lib/%.c # rule to compile each $(LIB) by itself
-	$(CC) -c $(DEBUG) $(LIB_FLAGS) -o $@ $<
+	$(CC) $(DEBUG) $(LIB_FLAGS) -o $@ $<
 
 clean: clean-obj clean-bin
 
