@@ -1,6 +1,6 @@
 CC = cc
 FLAGS = -Wall
-DEBUG = -gdwarf
+DEBUG = -gdwarf-2 -g3
 LINKER = -ldl
 TARGET = brimbot
 SOURCES = $(wildcard src/*.c)
