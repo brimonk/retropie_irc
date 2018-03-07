@@ -14,6 +14,7 @@ int cstr_init(cstr_t **ptr, int len, int buflen)
 		for (i = 0; i < len; i++) {
 			(*ptr)[i].len = buflen;
 			(*ptr)[i].buf = malloc(buflen);
+			memset((*ptr)[i].buf, 0, len);
 
 			if (!(*ptr)[i].buf) {
 				retval = 1;

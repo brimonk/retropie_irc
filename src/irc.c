@@ -74,10 +74,9 @@ int irc_send_message(int sock, int arrlen, cstr_t **out)
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 {
 	int lib_return;
-	int returnval;
 	cstr_t *resp_buf;
 
-	returnval = 0;
+	lib_return = 0;
 	if (cstr_init(&resp_buf, 8, BUFLEN)) {
 		error_and_exit("Not enough memory for irc_privmsg\n");
 	}
@@ -99,28 +98,23 @@ int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 		lib_return = irc_privmsg_unnamedfunc(resp_buf, ptr, str);
 	}
 
-	/* check the returnvalue against our enum list */
-	// returnval = irc_privmsg_retvalchk(lib_return);
+	/* provide the properly formatted cstr_t and the return value */
+	strncpy(resp_buf[1].buf, resp_buf[0].buf,
+			BUFLEN - strlen(resp_buf[1].buf));
+	strncat(resp_buf[1].buf, "\r\n", BUFLEN - strlen(resp_buf[1].buf));
+	strncpy(resp_buf[0].buf, channel, BUFLEN);
 
-	if (returnval == IRC_RETURN_OK) {
-		/* provide the properly formatted cstr_t and the return value */
-		strncpy(resp_buf[1].buf, resp_buf[0].buf,
-				BUFLEN - strlen(resp_buf[1].buf));
-		strncat(resp_buf[1].buf, "\r\n", BUFLEN - strlen(resp_buf[1].buf));
-		strncpy(resp_buf[0].buf, channel, BUFLEN);
+	resp_buf[1].len = strlen(resp_buf[1].buf);
+	resp_buf[0].len = strlen(resp_buf[0].buf);
 
-		resp_buf[1].len = strlen(resp_buf[1].buf);
-		resp_buf[0].len = strlen(resp_buf[0].buf);
-
-		returnval = irc_privmsg_respond(socket, lib_return, resp_buf);
-	}
+	irc_privmsg_respond(socket, lib_return, resp_buf);
 
 	free(prefix);
 	free(username);
 	free(command);
 	free(argument);
 
-	return returnval;
+	return lib_return;
 }
 
 int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
@@ -169,19 +163,20 @@ int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
 	return val;
 }
 
-int irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf)
+void irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf)
 {
-	int val;
+	/* 
+	 * this wrapper remains in the case that we need special cases 
+	 * for the various IRC_RETURN functions
+	 */
 
-	val = 0;
-	/* now spew the deets if we found anything */
-	if (irc_returnval == IRC_RETURN_OK) {
+	switch (irc_returnval) {
+	case IRC_RETURN_OK:
+	default:
 		irc_send_message(socket, 2, &buf);
+		break;
 	}
-
-	return val;
 }
-
 
 /* WARNING :: these parsing methods aren't clean TODO :: fix these */
 char *get_prefix(char line[])

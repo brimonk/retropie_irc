@@ -16,5 +16,4 @@ char *get_argument(char line[], int argno);
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str);
 int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
 int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
-int irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf);
-
+void irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf);

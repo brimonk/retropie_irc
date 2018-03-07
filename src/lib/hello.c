@@ -71,7 +71,7 @@ int hello(char *dest, int dest_size, cstr_t **in)
 		returnval = IRC_RETURN_NOMEM;
 	} else {
 		strncpy(dest, "Hello, ", dest_size - strlen(dest));
-		strncpy(dest, user, dest_size - strlen(dest));
+		strncat(dest, user, dest_size - strlen(dest));
 	}
 
 	return returnval;

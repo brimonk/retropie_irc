@@ -82,9 +82,8 @@ static void sock_close(int signo)
 
 int main(int argc, char **argv)
 {
-
 	/* define our array of cstrs */
-	int config_items, tmp, socket_desc;
+	int config_items, tmp, socket_desc, lib_num, irc_status;
 	char *config_name = "config.txt";
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
 	list_t *list_ptr;
@@ -105,9 +104,10 @@ int main(int argc, char **argv)
 	}
 
 	/* before an irc connection, we load up our shared object functionality */
-	printf("Loaded %d functions\n", load_irc_lib(LIBRARY_DIR, &list_ptr));
+	lib_num = load_irc_lib(LIBRARY_DIR, &list_ptr);
 
 	socket_desc = mk_socket(config_ptr, config_items);
+	socket_ptr = &socket_desc;
 
     char *nick = get_config(config_ptr, config_items, "nick");
     char *channels = get_config(config_ptr, config_items, "channels");
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-    for (;;) {
+    for (irc_status = IRC_RETURN_OK; irc_status != IRC_RETURN_QUIT;) {
 		memset(line, 0, BUFLEN);
         tmp = read_line(socket_desc, BUFLEN, line);
 
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
 			log_with_date(logline);
 
 			/* meat and potatoes */
-			irc_privmsg(socket_desc, line, list_ptr, str_ptr); 
+			irc_status = irc_privmsg(socket_desc, line, list_ptr, str_ptr); 
 
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
@@ -201,6 +201,9 @@ int main(int argc, char **argv)
     }
 
 	fclose(logfile);
+	close(socket_desc);
+
+	return 0;
 }
 
 int read_line(int sock, int n, char *buffer)
@@ -312,8 +315,6 @@ int load_irc_lib(char *lib_dir, list_t **list_ptr)
 				strcat(buf, lib_dir); /* prepare for dlopen */
 				strcat(buf, "/./");
 				strcat(buf, dir_struct->d_name);
-
-				printf("%s\n", buf);
 
 				returnval += load_lib(list_ptr, buf);
 			}

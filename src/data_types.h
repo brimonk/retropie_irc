@@ -1,5 +1,6 @@
 /* define required data types here for multiple inclusions */
 
+#include <limits.h>
 #include "cstr.h"
 
 #ifndef _DATATYPES_
@@ -39,13 +40,13 @@ enum { /* type of IRC command */
 };
 
 enum { /* return value to return to caller */
-	IRC_RETURN_OK				= 0x00,
-	IRC_RETURN_NOOUT			= 0x01,
-	IRC_RETURN_NOMEM			= 0x02,
-	IRC_RETURN_BADPERM			= 0x04,
-	IRC_RETURN_CMDNOSUPPORT		= 0x08,
+	IRC_RETURN_OK = 1,
+	IRC_RETURN_NOOUT = 2,
+	IRC_RETURN_NOMEM = 3,
+	IRC_RETURN_BADPERM = 4,
+	IRC_RETURN_CMDNOSUPPORT = 5,
 
-	IRC_RETURN_QUIT             = 0xFFFF
+	IRC_RETURN_QUIT             = INT_MAX
 };
 
 typedef struct list_t {
