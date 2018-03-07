@@ -7,6 +7,6 @@ typedef struct cstr_t {
 } cstr_t;
 
 int cstr_init(cstr_t **ptr, int len, int buflen);
-void cstr_free(cstr_t **ptr, int num);
+void cstr_free(cstr_t *ptr, int num);
 
 #endif

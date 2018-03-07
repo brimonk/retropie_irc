@@ -6,17 +6,21 @@
 int cstr_init(cstr_t **ptr, int len, int buflen)
 {
 	int i, retval;
+	cstr_t *tmp;
 
 	retval = 0;
 	*ptr = malloc(sizeof(cstr_t) * len);
 
 	if (*ptr) {
-		for (i = 0; i < len; i++) {
-			(*ptr)[i].len = buflen;
-			(*ptr)[i].buf = malloc(buflen);
-			memset((*ptr)[i].buf, 0, len);
 
-			if (!(*ptr)[i].buf) {
+		tmp = *ptr;
+		for (i = 0; i < len; i++) {
+			tmp[i].len = buflen;
+			tmp[i].buf = malloc(buflen);
+
+			if (tmp[i].buf) {
+				memset(tmp[i].buf, 0, len);
+			} else {
 				retval = 1;
 				break;
 			}
@@ -26,13 +30,13 @@ int cstr_init(cstr_t **ptr, int len, int buflen)
 	return retval;
 }
 
-void cstr_free(cstr_t **ptr, int num)
+void cstr_free(cstr_t *ptr, int num)
 {
 	int i;
 
-	if (*ptr) {
-		for (i = 0; i < num; i++) {
-			memset(&((*ptr)[i]), 0, sizeof(cstr_t));
-		}
+	for (i = 0; i < num; i++) {
+		free(ptr[i].buf);
 	}
+
+	free(ptr);
 }

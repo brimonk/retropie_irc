@@ -12,6 +12,8 @@ char *get_username(char line[]);
 char *get_command(char line[]);
 char *get_last_argument(char line[]);
 char *get_argument(char line[], int argno);
+char *get_argument_arguments(char *beginning);
+char *get_one_arg(char *input);
 
 /* irc_privmsg specifics */
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str);

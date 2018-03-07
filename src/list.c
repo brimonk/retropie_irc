@@ -48,3 +48,4 @@ list_t *list_add(list_t *head, list_t *ptr)
 
 	return head; /* we return the current head */
 }
+
