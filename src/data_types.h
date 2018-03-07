@@ -1,9 +1,9 @@
 /* define required data types here for multiple inclusions */
 
-typedef struct cstr_t {
-	char *buf;
-	int len;
-} cstr_t;
+#include "cstr.h"
+
+#ifndef _DATATYPES_
+#define _DATATYPES_
 
 typedef struct str_dict_t {
 	char *key;
@@ -53,3 +53,6 @@ typedef struct list_t {
 	struct list_t *prev;
 	void *data;
 } list_t;
+
+#endif
+

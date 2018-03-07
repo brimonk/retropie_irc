@@ -3,6 +3,8 @@
  * that deal with logging.
  */
 
+#include "data_types.h"
+
 void log_with_date(char line[]);
 void log_to_file(char line[], FILE *logfile);
 char *get_config(str_dict_t *ptr, int len, char *key);

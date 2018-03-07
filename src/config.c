@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "data_types.h"
+
+#include "config.h"
 #include "constants.h"
 
 void log_with_date(char line[])

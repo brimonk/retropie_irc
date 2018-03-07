@@ -65,14 +65,14 @@ int hello(char *dest, int dest_size, cstr_t **in)
 	char *user;
 
 	user = (*in)[1].buf;
-	returnval = 0;
+	returnval = IRC_RETURN_OK;
 
 	if (!dest) {
-		return -1;
+		returnval = IRC_RETURN_NOMEM;
+	} else {
+		strncpy(dest, "Hello, ", dest_size - strlen(dest));
+		strncpy(dest, user, dest_size - strlen(dest));
 	}
-
-	strncpy(dest, "Hello, ", dest_size - strlen(dest));
-	strncpy(dest, user, dest_size - strlen(dest));
 
 	return returnval;
 }

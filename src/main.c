@@ -43,35 +43,24 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
-#include "data_types.h"
-#include "constants.h"
-#include "irc.h"
 #include "config.h"
+#include "cstr.h"
+#include "constants.h"
+#include "data_types.h"
+#include "irc.h"
 #include "list.h"
 
 #define LIBRARY_DIR "./src/lib"
 
 int mk_socket(str_dict_t *config_ptr, int config_items);
-int cstr_init(cstr_t **ptr, int len, int buflen);
-void cstr_free(cstr_t **ptr, int num);
 int load_irc_lib(char *lib_dir, list_t **ptr);
 int load_lib(list_t **ptr, char *filename);
 
 void error_and_exit(char *s);
 
-int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str);
-int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
-int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
-int irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf);
-
 int read_line(int sock, int n, char *buffer);
 int read_line_nonblock(int sock, int n, char *buffer);
 int parse_irc_lines(char ***dest, char *buf, int n);
-char *get_prefix(char line[]);
-char *get_username(char line[]);
-char *get_command(char line[]);
-char *get_last_argument(char line[]);
-char *get_argument(char line[], int argno);
 int get_mem(void **ptr, int n);
 
 
@@ -296,219 +285,6 @@ int parse_irc_lines(char ***dest, char *buf, int n)
 	return newln_total;
 }
 
-char *get_prefix(char line[])
-{
-    char *prefix = malloc(512);
-    char clone[512];
-    strncpy(clone, line, strlen(line)+1);
-    if (line[0] == ':'){
-        char *splitted = strtok(clone, " ");
-        if (splitted != NULL){
-            strncpy(prefix, splitted+1, strlen(splitted)+1);
-        }else{
-            prefix[0] = '\0';
-        }
-    }else{
-        prefix[0] = '\0';
-    }
-    return prefix;
-}
-
-char *get_username(char line[])
-{
-    char *username = malloc(512);
-    char clone[512];
-    strncpy(clone, line, strlen(line)+1);
-    if (strchr(clone, '!') != NULL){
-        char *splitted = strtok(clone, "!");
-        if (splitted != NULL){
-            strncpy(username, splitted+1, strlen(splitted)+1);
-        }else{
-            username[0] = '\0';
-        }
-    }else{
-        username[0] = '\0';
-    }
-    return username;
-}
-
-char *get_command(char line[])
-{
-    char *command = malloc(512);
-    char clone[512];
-    strncpy(clone, line, strlen(line)+1);
-    char *splitted = strtok(clone, " ");
-
-	if (!command) {
-		return NULL;
-	}
-
-    if (splitted != NULL){
-        if (splitted[0] == ':'){
-            splitted = strtok(NULL, " ");
-        }
-        if (splitted != NULL){
-            strncpy(command, splitted, strlen(splitted)+1);
-        }else{
-            command[0] = '\0';
-        }
-    }else{
-        command[0] = '\0';
-    }
-
-    return command;
-}
-
-char *get_last_argument(char line[])
-{
-    char *argument = malloc(512);
-    char clone[512];
-    strncpy(clone, line, strlen(line)+1);
-    char *splitted = strstr(clone, " :");
-    if (splitted != NULL){
-        strncpy(argument, splitted+2, strlen(splitted)+1);
-    }else{
-        argument[0] = '\0';
-    }
-    return argument;
-}
-
-char *get_argument(char line[], int argno)
-{
-    char *argument = malloc(512);
-    char clone[512];
-    strncpy(clone, line, strlen(line)+1);
-    
-    int current_arg = 0;
-    char *splitted = strtok(clone, " ");
-    while (splitted != NULL){
-        if (splitted[0] != ':'){
-            current_arg++;
-        }
-        if (current_arg == argno+1){
-            strncpy(argument, splitted, strlen(splitted)+1);
-            return argument;
-        }
-        splitted = strtok(NULL, " ");
-    }
-    
-    if (current_arg != argno){
-        argument[0] = '\0';
-    }
-    return argument;
-}
-
-int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
-{
-	int lib_return;
-	int returnval;
-	cstr_t *resp_buf;
-
-	returnval = 0;
-	if (cstr_init(&resp_buf, 8, BUFLEN)) {
-		error_and_exit("Not enough memory for irc_privmsg\n");
-	}
-
-	char *prefix = get_prefix(input);
-	char *username = get_username(input);
-	char *command = get_command(input);
-	char *argument = get_last_argument(input);
-	char *channel = get_argument(input, 1);
-
-	/* spend some time setting up our cstr_t values */
-	strncpy(str[0].buf, channel, BUFLEN);
-	strncpy(str[1].buf, username, BUFLEN);
-	strncpy(str[2].buf, argument, BUFLEN);
-	strncpy(str[3].buf, argument, BUFLEN);
-
-	lib_return = irc_privmsg_namedfunc(resp_buf, ptr, str);
-	if (!lib_return) {
-		lib_return = irc_privmsg_unnamedfunc(resp_buf, ptr, str);
-	}
-
-	/* check the returnvalue against our enum list */
-	// returnval = irc_privmsg_retvalchk(lib_return);
-
-	if (returnval == IRC_RETURN_OK) {
-		/* provide the properly formatted cstr_t and the return value */
-		strncpy(resp_buf[1].buf, resp_buf[0].buf,
-				BUFLEN - strlen(resp_buf[1].buf));
-		strncat(resp_buf[1].buf, "\r\n", BUFLEN - strlen(resp_buf[1].buf));
-		strncpy(resp_buf[0].buf, channel, BUFLEN);
-
-		resp_buf[1].len = strlen(resp_buf[1].buf);
-		resp_buf[0].len = strlen(resp_buf[0].buf);
-
-		returnval = irc_privmsg_respond(socket, lib_return, resp_buf);
-	}
-
-	free(prefix);
-	free(username);
-	free(command);
-	free(argument);
-
-	return returnval;
-}
-
-int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
-{
-	int val;
-	char *tmp_text;
-
-	list_t *h;
-	val = 0;
-
-	/* 
-	 * iterate through the linked list we have, comparing the argument
-	 * text with lib_cmd_t->text
-	 */
-
-	for (h = ptr; h != NULL; h = h->next) {
-		tmp_text = ((lib_cmd_t *)h->data)->text;
-
-		if (strcmp(str[2].buf, tmp_text) == 0) {
-			val = ((lib_cmd_t *)h->data)->
-				funcptr(buf[0].buf, buf[0].len, &str);
-			break;
-		}
-	}
-
-	return val;
-}
-
-int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
-{
-	int val;
-	list_t *h;
-
-	val = 0;
-	/* execute all of the things that have "" as their text */
-	for (h = ptr; h != NULL; h = h->next) {
-		lib_cmd_t *tmp = (lib_cmd_t *)h->data;
-
-		if (strcmp(tmp->text, "") == 0) {
-			val = ((lib_cmd_t *)h->data)->
-				funcptr(buf[0].buf, buf[0].len, &str);
-			break;
-		}
-	}
-
-	return val;
-}
-
-int irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf)
-{
-	int val;
-
-	val = 0;
-	/* now spew the deets if we found anything */
-	if (irc_returnval == IRC_RETURN_OK) {
-		irc_send_message(socket, 2, &buf);
-	}
-
-	return val;
-}
-
 int load_irc_lib(char *lib_dir, list_t **list_ptr)
 {
 	/* 
@@ -610,39 +386,6 @@ int get_mem(void **ptr, int n)
 	return i;
 }
 
-int cstr_init(cstr_t **ptr, int len, int buflen)
-{
-	int i, retval;
-
-	retval = 0;
-	*ptr = malloc(sizeof(cstr_t) * len);
-
-	if (*ptr) {
-		for (i = 0; i < len; i++) {
-			(*ptr)[i].len = buflen;
-			(*ptr)[i].buf = malloc(buflen);
-
-			if (!(*ptr)[i].buf) {
-				retval = 1;
-				break;
-			}
-		}
-	}
-
-	return retval;
-}
-
-void cstr_free(cstr_t **ptr, int num)
-{
-	int i;
-
-	if (*ptr) {
-		for (i = 0; i < num; i++) {
-			memset(&((*ptr)[i]), 0, sizeof(cstr_t));
-		}
-	}
-}
-
 
 int mk_socket(str_dict_t *config_ptr, int config_items)
 {
@@ -667,10 +410,4 @@ int mk_socket(str_dict_t *config_ptr, int config_items)
     }
 
 	return socket_desc;
-}
-
-void error_and_exit(char *s)
-{
-	fprintf(stderr, "%s\n", s);
-	exit(EXIT_FAILURE);
 }
