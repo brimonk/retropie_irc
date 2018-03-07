@@ -29,3 +29,6 @@ Example Config File
     port = 6667
     nick = BrimBot
     channels = ##pentest
+
+## More Information
+More information can be found [here](https://tools.ietf.org/html/rfc1459#section-4.1.6).
