@@ -1,4 +1,3 @@
-w
 /*
  * Brian Chrzanowski
  * Tue Nov 28, 2017 00:03
@@ -63,7 +62,7 @@ void error_and_exit(char *s);
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str);
 int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
 int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
-int irc_privmsg_respond(int irc_returnval, int socket, cstr_t *buf);
+int irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf);
 
 int read_line(int sock, int n, char *buffer);
 int read_line_nonblock(int sock, int n, char *buffer);
@@ -99,7 +98,6 @@ int main(int argc, char **argv)
 	int config_items, tmp, socket_desc;
 	char *config_name = "config.txt";
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
-	char blastme[BUFLEN];
 	list_t *list_ptr;
 	str_dict_t *config_ptr;
 	cstr_t *str_ptr;
@@ -498,7 +496,7 @@ int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
 	return val;
 }
 
-int irc_privmsg_respond(int irc_returnval, int socket, cstr_t *buf)
+int irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf)
 {
 	int val;
 
@@ -507,7 +505,6 @@ int irc_privmsg_respond(int irc_returnval, int socket, cstr_t *buf)
 	if (irc_returnval == IRC_RETURN_OK) {
 		irc_send_message(socket, 2, &buf);
 	}
-
 
 	return val;
 }
