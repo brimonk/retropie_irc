@@ -32,3 +32,11 @@ Example Config File
 
 ## More Information
 More information can be found [here](https://tools.ietf.org/html/rfc1459#section-4.1.6).
+
+This project was somewhat inspired by these
+
+[Source Engine Plugins](https://developer.valvesoftware.com/wiki/Server_plugins)
+
+[Apache Modules](https://httpd.apache.org/docs/2.4/developer/modguide.html)
+
+[Postgres User Defined Functions](https://www.postgresql.org/docs/9.6/static/xfunc-c.html)
