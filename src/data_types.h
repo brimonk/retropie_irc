@@ -43,7 +43,9 @@ enum { /* return value to return to caller */
 	IRC_RETURN_NOOUT			= 0x01,
 	IRC_RETURN_NOMEM			= 0x02,
 	IRC_RETURN_BADPERM			= 0x04,
-	IRC_RETURN_CMDNOSUPPORT		= 0x08
+	IRC_RETURN_CMDNOSUPPORT		= 0x08,
+
+	IRC_RETURN_QUIT             = 0xFFFF
 };
 
 typedef struct list_t {

@@ -1,3 +1,4 @@
+w
 /*
  * Brian Chrzanowski
  * Tue Nov 28, 2017 00:03
@@ -31,9 +32,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
 #include <time.h>
+#include <string.h>
 
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -54,11 +54,16 @@
 
 int mk_socket(str_dict_t *config_ptr, int config_items);
 int cstr_init(cstr_t **ptr, int len, int buflen);
-void cstr_clean(cstr_t **ptr, int num);
+void cstr_free(cstr_t **ptr, int num);
 int load_irc_lib(char *lib_dir, list_t **ptr);
 int load_lib(list_t **ptr, char *filename);
 
 void error_and_exit(char *s);
+
+int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str);
+int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
+int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str);
+int irc_privmsg_respond(int irc_returnval, int socket, cstr_t *buf);
 
 int read_line(int sock, int n, char *buffer);
 int read_line_nonblock(int sock, int n, char *buffer);
@@ -87,7 +92,8 @@ static void sock_close(int signo)
 	close(*socket_ptr);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
 
 	/* define our array of cstrs */
 	int config_items, tmp, socket_desc;
@@ -171,68 +177,8 @@ int main(int argc, char **argv) {
             sprintf(logline, "%s/%s: %s", channel, username, argument);
 			log_with_date(logline);
 
-			/* 
-			 * check if there's a message to respond to by iterating over
-			 * the list of text->func_ptrs.
-			 */
-
-			// strncpy(str_ptr[1].buf, "Hello", BUFLEN);
-			// strncat(str_ptr[1].buf, " ", BUFLEN - strlen(str_ptr[1].buf));
-			// strncat(str_ptr[1].buf, username, BUFLEN - strlen(str_ptr[1].buf));
-			// strncat(str_ptr[1].buf, "\r\n", BUFLEN - strlen(str_ptr[1].buf));
-			// if (strncmp(argument, "!hello", 6) == 0) {
-			// 	irc_send_message(socket_desc, 2, &str_ptr);
-			// }
-
-			/* 
-			 * iterate through the linked list we have, comparing the argument
-			 * text with lib_cmd_t->text
-			 */
-
-			/* spend some time setting up our cstr_t values */
-			strncpy(str_ptr[0].buf, channel, BUFLEN);
-			strncpy(str_ptr[1].buf, username, BUFLEN);
-			strncpy(str_ptr[2].buf, argument, BUFLEN);
-			strncpy(str_ptr[3].buf, argument, BUFLEN);
-
-			list_t *h;
-			int cmd_found = 0;
-			int g = 0;
-			char *tmp_text;
-
-			for (h = list_ptr; h != NULL; h = h->next) {
-				tmp_text = ((lib_cmd_t *)h->data)->text;
-
-				if (strcmp(argument, tmp_text) == 0) {
-					cmd_found++;
-					((lib_cmd_t *)h->data)->funcptr(blastme, BUFLEN, &str_ptr);
-					break;
-				}
-			}
-
-			if (!cmd_found) {
-				/* execute all of the things that have "" as their text */
-				for (h = list_ptr; h != NULL; h = h->next) {
-					lib_cmd_t *tmp = (lib_cmd_t *)h->data;
-
-					if (strcmp(tmp->text, "") == 0) {
-						g = ((lib_cmd_t *)h->data)->
-							funcptr(blastme, BUFLEN, &str_ptr);
-						break;
-					}
-				}
-			}
-
-			/* now spew the deets if we found anything */
-			if (g == IRC_RETURN_OK || cmd_found == IRC_RETURN_OK) {
-				strncpy(str_ptr[0].buf, channel, BUFLEN);
-				strncpy(str_ptr[1].buf, &blastme[0], BUFLEN -
-						strlen(str_ptr[1].buf));
-				strncat(str_ptr[1].buf, "\r\n", BUFLEN -
-						strlen(str_ptr[1].buf));
-
-				irc_send_message(socket_desc, 2, &str_ptr);
-			}
+			/* meat and potatoes */
+			irc_privmsg(socket_desc, line, list_ptr, str_ptr); 
 
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
@@ -270,8 +216,9 @@ int main(int argc, char **argv) {
 	fclose(logfile);
 }
 
-int read_line(int sock, int n, char *buffer) {
-    size_t length = 0;
+int read_line(int sock, int n, char *buffer)
+{
+    int length = 0;
 
     while (1) {
         char data;
@@ -453,6 +400,118 @@ char *get_argument(char line[], int argno)
     return argument;
 }
 
+int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
+{
+	int lib_return;
+	int returnval;
+	cstr_t *resp_buf;
+
+	returnval = 0;
+	if (cstr_init(&resp_buf, 8, BUFLEN)) {
+		error_and_exit("Not enough memory for irc_privmsg\n");
+	}
+
+	char *prefix = get_prefix(input);
+	char *username = get_username(input);
+	char *command = get_command(input);
+	char *argument = get_last_argument(input);
+	char *channel = get_argument(input, 1);
+
+	/* spend some time setting up our cstr_t values */
+	strncpy(str[0].buf, channel, BUFLEN);
+	strncpy(str[1].buf, username, BUFLEN);
+	strncpy(str[2].buf, argument, BUFLEN);
+	strncpy(str[3].buf, argument, BUFLEN);
+
+	lib_return = irc_privmsg_namedfunc(resp_buf, ptr, str);
+	if (!lib_return) {
+		lib_return = irc_privmsg_unnamedfunc(resp_buf, ptr, str);
+	}
+
+	/* check the returnvalue against our enum list */
+	// returnval = irc_privmsg_retvalchk(lib_return);
+
+	if (returnval == IRC_RETURN_OK) {
+		/* provide the properly formatted cstr_t and the return value */
+		strncpy(resp_buf[1].buf, resp_buf[0].buf,
+				BUFLEN - strlen(resp_buf[1].buf));
+		strncat(resp_buf[1].buf, "\r\n", BUFLEN - strlen(resp_buf[1].buf));
+		strncpy(resp_buf[0].buf, channel, BUFLEN);
+
+		resp_buf[1].len = strlen(resp_buf[1].buf);
+		resp_buf[0].len = strlen(resp_buf[0].buf);
+
+		returnval = irc_privmsg_respond(socket, lib_return, resp_buf);
+	}
+
+	free(prefix);
+	free(username);
+	free(command);
+	free(argument);
+
+	return returnval;
+}
+
+int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
+{
+	int val;
+	char *tmp_text;
+
+	list_t *h;
+	val = 0;
+
+	/* 
+	 * iterate through the linked list we have, comparing the argument
+	 * text with lib_cmd_t->text
+	 */
+
+	for (h = ptr; h != NULL; h = h->next) {
+		tmp_text = ((lib_cmd_t *)h->data)->text;
+
+		if (strcmp(str[2].buf, tmp_text) == 0) {
+			val = ((lib_cmd_t *)h->data)->
+				funcptr(buf[0].buf, buf[0].len, &str);
+			break;
+		}
+	}
+
+	return val;
+}
+
+int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
+{
+	int val;
+	list_t *h;
+
+	val = 0;
+	/* execute all of the things that have "" as their text */
+	for (h = ptr; h != NULL; h = h->next) {
+		lib_cmd_t *tmp = (lib_cmd_t *)h->data;
+
+		if (strcmp(tmp->text, "") == 0) {
+			val = ((lib_cmd_t *)h->data)->
+				funcptr(buf[0].buf, buf[0].len, &str);
+			break;
+		}
+	}
+
+	return val;
+}
+
+int irc_privmsg_respond(int irc_returnval, int socket, cstr_t *buf)
+{
+	int val;
+
+	val = 0;
+	/* now spew the deets if we found anything */
+	if (irc_returnval == IRC_RETURN_OK) {
+		irc_send_message(socket, 2, &buf);
+	}
+
+
+	return val;
+}
+
 int load_irc_lib(char *lib_dir, list_t **list_ptr)
 {
 	/* 
@@ -576,7 +635,7 @@ int cstr_init(cstr_t **ptr, int len, int buflen)
 	return retval;
 }
 
-void cstr_clean(cstr_t **ptr, int num)
+void cstr_free(cstr_t **ptr, int num)
 {
 	int i;
 
