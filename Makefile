@@ -16,7 +16,7 @@ src/%.o: src/%.c # rule to compile each $(TARGET) object
 	$(CC) -c $(DEBUG) $(FLAGS) -o $@ $<
 
 src/lib/%.so: src/lib/%.c # rule to compile each $(LIB) by itself
-	$(CC) $(DEBUG) $(LIB_FLAGS) -o $@ $<
+	$(CC) $(DEBUG) $(FLAGS) $(LIB_FLAGS) -o $@ $<
 
 clean: clean-obj clean-bin
 

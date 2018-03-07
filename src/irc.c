@@ -15,6 +15,7 @@
 #include <arpa/inet.h>
 
 #include "data_types.h"
+#include "constants.h"
 
 int irc_set_nick(int sock, int arrlen, cstr_t **out)
 {
@@ -61,6 +62,7 @@ int irc_send_message(int sock, int arrlen, cstr_t **out)
 {
     char message_packet[512];
 	int sendretval;
+	memset(message_packet, 0, BUFLEN);
     sprintf(message_packet, "PRIVMSG %s :%s\r\n", (*out)[0].buf, (*out)[1].buf);
     sendretval = send(sock, message_packet, strlen(message_packet), 0);
 

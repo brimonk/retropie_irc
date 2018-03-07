@@ -34,8 +34,8 @@ typedef struct lib_cmd_t {
 } lib_cmd_t;
 
 enum { /* type of IRC command */
-	IRC_TYPE_CALLRESPONSE,
-	IRC_TYPE_RESPONSE
+	IRC_TYPE_CALLRESPONSE = 1,
+	IRC_TYPE_RESPONSE = 2
 };
 
 enum { /* return value to return to caller */
@@ -46,3 +46,8 @@ enum { /* return value to return to caller */
 	IRC_RETURN_CMDNOSUPPORT		= 0x08
 };
 
+typedef struct list_t {
+	struct list_t *next;
+	struct list_t *prev;
+	void *data;
+} list_t;

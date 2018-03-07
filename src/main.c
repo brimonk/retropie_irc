@@ -48,14 +48,15 @@
 #include "constants.h"
 #include "irc.h"
 #include "config.h"
+#include "list.h"
 
 #define LIBRARY_DIR "./src/lib"
 
 int mk_socket(str_dict_t *config_ptr, int config_items);
 int cstr_init(cstr_t **ptr, int len, int buflen);
 void cstr_clean(cstr_t **ptr, int num);
-int load_irc_lib(char *lib_dir, lib_cmd_t **ptr);
-int load_lib(lib_cmd_t **ptr, int n, char *filename);
+int load_irc_lib(char *lib_dir, list_t **ptr);
+int load_lib(list_t **ptr, char *filename);
 
 void error_and_exit(char *s);
 
@@ -67,6 +68,7 @@ char *get_username(char line[]);
 char *get_command(char line[]);
 char *get_last_argument(char line[]);
 char *get_argument(char line[], int argno);
+int get_mem(void **ptr, int n);
 
 
 /* define our list of built in irc functions */
@@ -88,10 +90,11 @@ static void sock_close(int signo)
 int main(int argc, char **argv) {
 
 	/* define our array of cstrs */
-	int config_items, tmp, socket_desc, lib_funcs;
+	int config_items, tmp, socket_desc;
 	char *config_name = "config.txt";
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
-	lib_cmd_t *lib_ptr;
+	char blastme[BUFLEN];
+	list_t *list_ptr;
 	str_dict_t *config_ptr;
 	cstr_t *str_ptr;
 
@@ -109,7 +112,7 @@ int main(int argc, char **argv) {
 	}
 
 	/* before an irc connection, we load up our shared object functionality */
-	lib_funcs = load_irc_lib(LIBRARY_DIR, &lib_ptr);
+	printf("Loaded %d functions\n", load_irc_lib(LIBRARY_DIR, &list_ptr));
 
 	socket_desc = mk_socket(config_ptr, config_items);
 
@@ -160,31 +163,74 @@ int main(int argc, char **argv) {
         if (strcmp(command, "PING") == 0){
 			strncpy(str_ptr[0].buf, argument, 512);
             irc_send_pong(socket_desc, 5, &str_ptr);
-            log_with_date("Got ping. Replying with pong...");
+			sprintf(logline, "Got ping. Replying with pong...");
+			log_with_date(logline);
         } else if (strcmp(command, "PRIVMSG") == 0){
             char *channel = get_argument(line, 1);
-			char *buf = malloc(BUFLEN);
-
-			if (!buf) {
-				fprintf(stderr, "memory error\n");
-				return 1;
-			}
 
             sprintf(logline, "%s/%s: %s", channel, username, argument);
-            log_with_date(logline);
+			log_with_date(logline);
 
 			/* 
 			 * check if there's a message to respond to by iterating over
 			 * the list of text->func_ptrs.
 			 */
 
-			strncpy(str_ptr[0].buf, channel, BUFLEN);
-			strncpy(str_ptr[1].buf, "Hello", BUFLEN);
-			strncat(str_ptr[1].buf, " ", BUFLEN - strlen(str_ptr[1].buf));
-			strncat(str_ptr[1].buf, username, BUFLEN - strlen(str_ptr[1].buf));
-			strncat(str_ptr[1].buf, "\r\n", BUFLEN - strlen(str_ptr[1].buf));
+			// strncpy(str_ptr[1].buf, "Hello", BUFLEN);
+			// strncat(str_ptr[1].buf, " ", BUFLEN - strlen(str_ptr[1].buf));
+			// strncat(str_ptr[1].buf, username, BUFLEN - strlen(str_ptr[1].buf));
+			// strncat(str_ptr[1].buf, "\r\n", BUFLEN - strlen(str_ptr[1].buf));
+			// if (strncmp(argument, "!hello", 6) == 0) {
+			// 	irc_send_message(socket_desc, 2, &str_ptr);
+			// }
 
-			if (strncmp(argument, "!hello", 6) == 0) {
+			/* 
+			 * iterate through the linked list we have, comparing the argument
+			 * text with lib_cmd_t->text
+			 */
+
+			/* spend some time setting up our cstr_t values */
+			strncpy(str_ptr[0].buf, channel, BUFLEN);
+			strncpy(str_ptr[1].buf, username, BUFLEN);
+			strncpy(str_ptr[2].buf, argument, BUFLEN);
+			strncpy(str_ptr[3].buf, argument, BUFLEN);
+
+			list_t *h;
+			int cmd_found = 0;
+			int g = 0;
+			char *tmp_text;
+
+			for (h = list_ptr; h != NULL; h = h->next) {
+				tmp_text = ((lib_cmd_t *)h->data)->text;
+
+				if (strcmp(argument, tmp_text) == 0) {
+					cmd_found++;
+					((lib_cmd_t *)h->data)->funcptr(blastme, BUFLEN, &str_ptr);
+					break;
+				}
+			}
+
+			if (!cmd_found) {
+				/* execute all of the things that have "" as their text */
+				for (h = list_ptr; h != NULL; h = h->next) {
+					lib_cmd_t *tmp = (lib_cmd_t *)h->data;
+
+					if (strcmp(tmp->text, "") == 0) {
+						g = ((lib_cmd_t *)h->data)->
+							funcptr(blastme, BUFLEN, &str_ptr);
+						break;
+					}
+				}
+			}
+
+			/* now spew the deets if we found anything */
+			if (g == IRC_RETURN_OK || cmd_found == IRC_RETURN_OK) {
+				strncpy(str_ptr[0].buf, channel, BUFLEN);
+				strncpy(str_ptr[1].buf, &blastme[0], BUFLEN -
+						strlen(str_ptr[1].buf));
+				strncat(str_ptr[1].buf, "\r\n", BUFLEN -
+						strlen(str_ptr[1].buf));
+
 				irc_send_message(socket_desc, 2, &str_ptr);
 			}
 
@@ -195,7 +241,7 @@ int main(int argc, char **argv) {
         } else if (strcmp(command, "JOIN") == 0){
             char *channel = get_argument(line, 1);
             sprintf(logline, "%s joined %s.", username, channel);
-            log_with_date(logline);
+			log_with_date(logline);
             
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
@@ -204,13 +250,14 @@ int main(int argc, char **argv) {
         } else if (strcmp(command, "PART") == 0){
             char *channel = get_argument(line, 1);
             sprintf(logline, "%s left %s.", username, channel);
-            log_with_date(logline);
+			log_with_date(logline);
             
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
             log_to_file(logline, logfile);
             free(channel);
         }
+
 
 		memset(logline, 0, BUFLEN);
 
@@ -406,7 +453,7 @@ char *get_argument(char line[], int argno)
     return argument;
 }
 
-int load_irc_lib(char *lib_dir, lib_cmd_t **ptr)
+int load_irc_lib(char *lib_dir, list_t **list_ptr)
 {
 	/* 
 	 * spin through lib_dir, loading each *.so into the ptr list 
@@ -415,8 +462,8 @@ int load_irc_lib(char *lib_dir, lib_cmd_t **ptr)
 
 	DIR *dirptr;
 	struct dirent *dir_struct;
-	char *dot_ptr;
 	int returnval;
+	char *dot_ptr;
 	char buf[BUFLEN];
 
 	dirptr = opendir(lib_dir);
@@ -436,25 +483,25 @@ int load_irc_lib(char *lib_dir, lib_cmd_t **ptr)
 
 				printf("%s\n", buf);
 
-				returnval += load_lib(ptr, returnval, buf);
+				returnval += load_lib(list_ptr, buf);
 			}
 		}
 
 		closedir(dirptr);
 	} else {
 		printf("Couldn't open '%s'\n", lib_dir);
-		returnval = -1;
 	}
 
 	return returnval;
 }
 
-int load_lib(lib_cmd_t **ptr, int n, char *filename)
+int load_lib(list_t **ptr, char *filename)
 {
 	void *objhandle;
-	lib_cmd_t *dicthandle;
+	lib_cmd_t *dictptr, *copy;
+	list_t *data;
 	int i = 0, val = 0;
-	char *error, *text;
+	char *error;
 
 	/* begin by loading objhandle with the shared object handle */
 	objhandle = dlopen(filename, RTLD_NOW);
@@ -464,18 +511,47 @@ int load_lib(lib_cmd_t **ptr, int n, char *filename)
 	}
 
 	/* now load the table each shared object must have */
-	*(void **) (&dicthandle) = dlsym(objhandle, "entry_dict");
+	*(void **) (&dictptr) = dlsym(objhandle, "entry_dict");
 	error = dlerror();
 	if (error != NULL) {
 		error_and_exit(error);
 	}
 
 	/* iterate through the table, loading each function into ptr */
-	for (i = 0; (text = dicthandle[i].text) != NULL; i++) {
-		printf("%s\n", text);
+	for (i = 0; dictptr[i].text != NULL && dictptr[i].funcptr && dictptr[i].type; i++) {
+		/* dump the data into another dynamic structure */
+		copy = malloc(sizeof(lib_cmd_t));
+		if (copy) {
+			if (get_mem((void **)&copy->text, BUFLEN)) {
+				error_and_exit("Couldn't get memory in load_lib, text\n");
+			}
+
+			strcpy(copy->text, dictptr[i].text);
+			copy->funcptr = dictptr[i].funcptr;
+			copy->type = dictptr[i].type;
+
+			data = list_create(copy); /* make a new node */
+			*ptr = list_add(*ptr, data);
+			val++;
+		} else {
+			error_and_exit("Couldn't get memory in load_lib\n");
+		}
 	}
 
 	return val;
+}
+
+int get_mem(void **ptr, int n)
+{
+	int i;
+	*ptr = malloc(n);
+
+	i = 0;
+	if (!(*ptr)) {
+		i = 1;
+	}
+
+	return i;
 }
 
 int cstr_init(cstr_t **ptr, int len, int buflen)

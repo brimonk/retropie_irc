@@ -55,7 +55,7 @@ int no_all_caps(char *dest, int dest_size, cstr_t **in);
 lib_cmd_t entry_dict[] = {
 	{"!hello", hello, IRC_TYPE_CALLRESPONSE},
 	{"", no_all_caps, IRC_TYPE_RESPONSE},
-	{NULL, 0, 0} /* signifies no more entries */
+	{NULL, NULL, 0} /* signifies no more entries */
 };
 
 /* therefore, a nice entry function might be formatted like this */
@@ -89,8 +89,8 @@ int no_all_caps(char *dest, int dest_size, cstr_t **in)
 	user  = (*in)[1].buf;
 	input = (*in)[3].buf;
 
-	for (i = 0, upperstatus = 1; i < strlen(dest); i++) {
-		if (islower(input + i)) {
+	for (i = 0, upperstatus = 1; i < strlen(input); i++) {
+		if (islower(input[i])) {
 			upperstatus = 0;
 			break;
 		}
@@ -105,6 +105,8 @@ int no_all_caps(char *dest, int dest_size, cstr_t **in)
 			returnval = IRC_RETURN_OK;
 		}
 	}
+
+	printf("%s\n", dest);
 
 	return returnval;
 }
