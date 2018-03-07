@@ -40,3 +40,12 @@ void cstr_free(cstr_t *ptr, int num)
 
 	free(ptr);
 }
+
+void cstr_clear(cstr_t *ptr, int num, int len)
+{
+	int i;
+
+	for (i = 0; i < num; i++) {
+		memset(ptr[i].buf, 0, len);
+	}
+}

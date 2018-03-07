@@ -82,27 +82,27 @@ int no_all_caps(char *dest, int dest_size, cstr_t **in)
 	/* just a function to check if each byte in the message is uppercase */
 
 	/* boilerplate */
-	int returnval, i, upperstatus;
+	int returnval, i, upperchars;
 	char *user, *input;
 	char *message = "%s, please don't write in all caps. IT'S REALLY ANNOYING.";
 
 	user  = (*in)[1].buf;
 	input = (*in)[3].buf;
+	returnval = IRC_RETURN_OK;
 
-	for (i = 0, upperstatus = 1; i < strlen(input); i++) {
-		if (islower(input[i])) {
-			upperstatus = 0;
-			break;
+	for (i = 0, upperchars = 0; i < strlen(input); i++) {
+		if (isupper(input[i])) {
+			upperchars++;
 		}
 	}
 
-	/* check if we have enough space */
-	if (upperstatus) {
+	/* if 90% of your message is uppercase */
+	if ((double)upperchars / (double)strlen(input) > .8) {
+		/* check if we have enough space */
 		if (dest_size < strlen(message) - 2 + strlen(user)) {
 			returnval = IRC_RETURN_NOMEM;
 		} else {
 			sprintf(dest, message, user);
-			returnval = IRC_RETURN_OK;
 		}
 	}
 

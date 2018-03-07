@@ -105,6 +105,9 @@ int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 
 	lib_return = irc_privmsg_namedfunc(&str[8], ptr, str);
 	if (!lib_return) {
+		free(argument);
+		argument = get_last_argument(input);
+		strncpy(str[3].buf, argument, BUFLEN);
 		lib_return = irc_privmsg_unnamedfunc(&str[8], ptr, str);
 	}
 

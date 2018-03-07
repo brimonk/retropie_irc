@@ -192,7 +192,7 @@ int main(int argc, char **argv)
             free(channel);
         }
 
-
+		cstr_clear(str_ptr, 64, BUFLEN);
 		memset(logline, 0, BUFLEN);
 
 		if (prefix) { free(prefix); }
