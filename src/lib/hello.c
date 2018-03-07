@@ -106,8 +106,6 @@ int no_all_caps(char *dest, int dest_size, cstr_t **in)
 		}
 	}
 
-	printf("%s\n", dest);
-
 	return returnval;
 }
 

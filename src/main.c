@@ -157,12 +157,12 @@ int main(int argc, char **argv)
 			strncpy(str_ptr[0].buf, argument, 512);
             irc_send_pong(socket_desc, 5, &str_ptr);
 			sprintf(logline, "Got ping. Replying with pong...");
-			log_with_date(logline);
+			log_to_file(logline, logfile);
         } else if (strcmp(command, "PRIVMSG") == 0){
             char *channel = get_argument(line, 1);
 
             sprintf(logline, "%s/%s: %s", channel, username, argument);
-			log_with_date(logline);
+			log_to_file(logline, logfile);
 
 			/* meat and potatoes */
 			irc_status = irc_privmsg(socket_desc, line, list_ptr, str_ptr); 
@@ -174,7 +174,7 @@ int main(int argc, char **argv)
         } else if (strcmp(command, "JOIN") == 0){
             char *channel = get_argument(line, 1);
             sprintf(logline, "%s joined %s.", username, channel);
-			log_with_date(logline);
+			log_to_file(logline, logfile);
             
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
         } else if (strcmp(command, "PART") == 0){
             char *channel = get_argument(line, 1);
             sprintf(logline, "%s left %s.", username, channel);
-			log_with_date(logline);
+			log_to_file(logline, logfile);
             
             sprintf(filename, "%s.log.txt", channel);
             freopen(filename, "a+", logfile);
@@ -200,8 +200,13 @@ int main(int argc, char **argv)
         if (argument) { free(argument); }
     }
 
+	/* quit irc */
+	strncpy(str_ptr[0].buf, "I was told to...", str_ptr[0].len);
+	irc_send_quit(socket_desc, 1, &str_ptr);
+
 	fclose(logfile);
-	close(socket_desc);
+	shutdown(socket_desc, SHUT_RDWR);
+	// close(socket_desc);
 
 	return 0;
 }

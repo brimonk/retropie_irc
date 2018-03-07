@@ -6,18 +6,6 @@
 #include "config.h"
 #include "constants.h"
 
-void log_with_date(char line[])
-{
-    char date[50];
-    struct tm *current_time;
-
-    time_t now = time(0);
-    current_time = gmtime(&now);
-    strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", current_time);
-
-    printf("[%s] %s\n", date, line);
-}
-
 void log_to_file(char line[], FILE *logfile)
 {
     char date[50];

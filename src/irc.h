@@ -5,6 +5,7 @@ int irc_send_user(int sock, int arrlen, cstr_t **out);
 int irc_join_channel(int sock, int arrlen, cstr_t **out);
 int irc_send_pong(int sock, int arrlen, cstr_t **out);
 int irc_send_message(int sock, int arrlen, cstr_t **out);
+int irc_send_quit(int sock, int arrlen, cstr_t **out);
 
 char *get_prefix(char line[]);
 char *get_username(char line[]);

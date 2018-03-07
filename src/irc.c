@@ -71,6 +71,18 @@ int irc_send_message(int sock, int arrlen, cstr_t **out)
 	return (sendretval > 0) ? 1 : 0;
 }
 
+int irc_send_quit(int sock, int arrlen, cstr_t **out)
+{
+	char message_packet[512];
+	int sendretval;
+	memset(message_packet, 0, BUFLEN);
+    sprintf(message_packet, "QUIT : %s\r\n", (*out)[0].buf);
+    sendretval = send(sock, message_packet, strlen(message_packet), 0);
+
+	return (sendretval > 0) ? 1 : 0;
+
+}
+
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 {
 	int lib_return;
