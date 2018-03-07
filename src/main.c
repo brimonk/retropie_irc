@@ -62,6 +62,7 @@ int read_line(int sock, int n, char *buffer);
 int read_line_nonblock(int sock, int n, char *buffer);
 int parse_irc_lines(char ***dest, char *buf, int n);
 int get_mem(void **ptr, int n);
+void unload_lib(list_t *ptr);
 
 
 /* define our list of built in irc functions */
@@ -86,8 +87,8 @@ int main(int argc, char **argv)
 	int config_items, tmp, socket_desc, lib_num, irc_status;
 	char *config_name = "config.txt";
 	char logline[BUFLEN], filename[BUFLEN], line[BUFLEN];
-	list_t *list_ptr;
-	str_dict_t *config_ptr;
+	list_t *list_ptr = 0;
+	str_dict_t *config_ptr = 0;
 	cstr_t *str_ptr;
 
 	if (signal(SIGTERM, sock_close) == SIG_ERR) {
@@ -206,7 +207,11 @@ int main(int argc, char **argv)
 
 	fclose(logfile);
 	shutdown(socket_desc, SHUT_RDWR);
-	// close(socket_desc);
+
+	/* unload our libraries and free some mem */
+	unload_lib(list_ptr);
+	cstr_free(str_ptr, 64);
+	config_free(&config_ptr, 64);
 
 	return 0;
 }
@@ -297,7 +302,7 @@ int load_irc_lib(char *lib_dir, list_t **list_ptr)
 {
 	/* 
 	 * spin through lib_dir, loading each *.so into the ptr list 
-	 * returns number of lib_cmd_ts we fully loaded
+	 * returns number of lib_tbl_t we fully loaded
 	 */
 
 	DIR *dirptr;
@@ -336,7 +341,8 @@ int load_irc_lib(char *lib_dir, list_t **list_ptr)
 int load_lib(list_t **ptr, char *filename)
 {
 	void *objhandle;
-	lib_cmd_t *dictptr, *copy;
+	lib_cmd_t *dictptr;
+	lib_tbl_t *copy;
 	list_t *data;
 	int i = 0, val = 0;
 	char *error;
@@ -358,13 +364,14 @@ int load_lib(list_t **ptr, char *filename)
 	/* iterate through the table, loading each function into ptr */
 	for (i = 0; dictptr[i].text != NULL && dictptr[i].funcptr && dictptr[i].type; i++) {
 		/* dump the data into another dynamic structure */
-		copy = malloc(sizeof(lib_cmd_t));
+		copy = malloc(sizeof(lib_tbl_t));
 		if (copy) {
 			if (get_mem((void **)&copy->text, BUFLEN)) {
 				error_and_exit("Couldn't get memory in load_lib, text\n");
 			}
 
 			strcpy(copy->text, dictptr[i].text);
+			copy->objhandle = objhandle;
 			copy->funcptr = dictptr[i].funcptr;
 			copy->type = dictptr[i].type;
 
@@ -377,6 +384,31 @@ int load_lib(list_t **ptr, char *filename)
 	}
 
 	return val;
+}
+
+void unload_lib(list_t *ptr)
+{
+	/* recursively walk through the list, freeing all of the objects  */
+	list_t *curr;
+	lib_tbl_t *a;
+
+	while (ptr != NULL) {
+		curr = ptr;
+		ptr = ptr->next;
+
+		a = (lib_tbl_t *)curr->data;
+
+		if (a) {
+			free(a->text);
+
+			dlclose(a->objhandle);
+			dlerror();
+
+			free(a);
+		}
+
+		free(curr);
+	}
 }
 
 int get_mem(void **ptr, int n)

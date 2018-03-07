@@ -54,6 +54,7 @@ int config_load(str_dict_t **ptr, int len, char *file_name)
 	char buf[BUFLEN];
 
 	*ptr = malloc(sizeof(str_dict_t) * len);
+	memset(*ptr, 0, sizeof(str_dict_t) * len);
 
 	if (!*ptr) {
 		return -1;
@@ -85,4 +86,27 @@ int config_load(str_dict_t **ptr, int len, char *file_name)
 	}
 
 	return i;
+}
+
+void config_free(str_dict_t **ptr, int size)
+{
+	int i;
+	str_dict_t *tmp;
+
+	tmp = *ptr;
+
+	for (i = 0; i < size; i++) {
+
+		if (tmp[i].key) {
+			free(tmp[i].key);
+			tmp[i].key = NULL;
+		}
+
+		if (tmp[i].value) {
+			free(tmp[i].value);
+			tmp[i].value = NULL;
+		}
+	}
+
+	free(tmp);
 }

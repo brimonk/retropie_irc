@@ -76,7 +76,7 @@ int irc_send_quit(int sock, int arrlen, cstr_t **out)
 	char message_packet[512];
 	int sendretval;
 	memset(message_packet, 0, BUFLEN);
-    sprintf(message_packet, "QUIT : %s\r\n", (*out)[0].buf);
+    sprintf(message_packet, "QUIT :%s\r\n", (*out)[0].buf);
     sendretval = send(sock, message_packet, strlen(message_packet), 0);
 
 	return (sendretval > 0) ? 1 : 0;
@@ -86,45 +86,40 @@ int irc_send_quit(int sock, int arrlen, cstr_t **out)
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 {
 	int lib_return;
-	cstr_t *resp_buf;
-
 	lib_return = 0;
-	if (cstr_init(&resp_buf, 8, BUFLEN)) {
-		error_and_exit("Not enough memory for irc_privmsg\n");
-	}
 
 	char *prefix = get_prefix(input);
 	char *username = get_username(input);
 	char *command = get_command(input);
-	char *argument = get_last_argument(input);
+	char *argument = get_one_arg(input);
+	char *full_list = get_argument_arguments(input);
 	char *channel = get_argument(input, 1);
 
 	/* spend some time setting up our cstr_t values */
 	strncpy(str[0].buf, channel, BUFLEN);
 	strncpy(str[1].buf, username, BUFLEN);
-	strncpy(str[2].buf, argument, BUFLEN);
-	strncpy(str[3].buf, argument, BUFLEN);
+	if (argument) {
+		strncpy(str[2].buf, argument, BUFLEN);
+	}
+	strncpy(str[3].buf, full_list, BUFLEN);
 
-	lib_return = irc_privmsg_namedfunc(resp_buf, ptr, str);
+	lib_return = irc_privmsg_namedfunc(&str[8], ptr, str);
 	if (!lib_return) {
-		lib_return = irc_privmsg_unnamedfunc(resp_buf, ptr, str);
+		lib_return = irc_privmsg_unnamedfunc(&str[8], ptr, str);
 	}
 
 	/* provide the properly formatted cstr_t and the return value */
-	strncpy(resp_buf[1].buf, resp_buf[0].buf,
-			BUFLEN - strlen(resp_buf[1].buf));
-	strncat(resp_buf[1].buf, "\r\n", BUFLEN - strlen(resp_buf[1].buf));
-	strncpy(resp_buf[0].buf, channel, BUFLEN);
+	strncpy(str[0].buf, channel, BUFLEN);
+	strncpy(str[1].buf, str[8].buf, BUFLEN - strlen(str[8].buf));
+	strncat(str[1].buf, "\r\n", BUFLEN - strlen(str[8].buf));
 
-	resp_buf[1].len = strlen(resp_buf[1].buf);
-	resp_buf[0].len = strlen(resp_buf[0].buf);
-
-	irc_privmsg_respond(socket, lib_return, resp_buf);
+	irc_privmsg_respond(socket, lib_return, str);
 
 	free(prefix);
 	free(username);
 	free(command);
 	free(argument);
+	free(channel);
 
 	return lib_return;
 }
@@ -139,14 +134,14 @@ int irc_privmsg_namedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
 
 	/* 
 	 * iterate through the linked list we have, comparing the argument
-	 * text with lib_cmd_t->text
+	 * text with lib_tbl_t->text
 	 */
 
 	for (h = ptr; h != NULL; h = h->next) {
-		tmp_text = ((lib_cmd_t *)h->data)->text;
+		tmp_text = ((lib_tbl_t *)h->data)->text;
 
 		if (strcmp(str[2].buf, tmp_text) == 0) {
-			val = ((lib_cmd_t *)h->data)->
+			val = ((lib_tbl_t *)h->data)->
 				funcptr(buf[0].buf, buf[0].len, &str);
 			break;
 		}
@@ -163,10 +158,10 @@ int irc_privmsg_unnamedfunc(cstr_t *buf, list_t *ptr, cstr_t *str)
 	val = 0;
 	/* execute all of the things that have "" as their text */
 	for (h = ptr; h != NULL; h = h->next) {
-		lib_cmd_t *tmp = (lib_cmd_t *)h->data;
+		lib_tbl_t *tmp = (lib_tbl_t *)h->data;
 
 		if (strcmp(tmp->text, "") == 0) {
-			val = ((lib_cmd_t *)h->data)->
+			val = ((lib_tbl_t *)h->data)->
 				funcptr(buf[0].buf, buf[0].len, &str);
 			break;
 		}
@@ -293,3 +288,43 @@ char *get_argument(char line[], int argno)
     return argument;
 }
 
+char *get_argument_arguments(char *input)
+{
+	/* returns a pointer to the next word after line */
+	int i;
+	char *curr;
+
+	curr = strrchr(input, ':');
+	for (i = 0; i < strlen(curr); i++) {
+		if (curr[i] == ' ') {
+			i++;
+			break;
+		}
+	}
+
+	return curr + i;
+}
+
+char *get_one_arg(char *input)
+{
+	char *val = malloc(BUFLEN);
+    char *splitted = strstr(input, " :");
+	splitted += 2;
+
+    if (splitted != NULL){
+		char *tmp = strchr(splitted, ' ');
+
+		if (tmp != NULL) {
+			strncpy(val, splitted, tmp - splitted);
+			*(val + (tmp - splitted)) = 0;
+		} else { /* one argument command */
+			strncpy(val, splitted, strlen(splitted));
+			val[strlen(splitted)] = 0;
+		}
+
+    }else{
+		val = NULL;
+    }
+
+    return val;
+}

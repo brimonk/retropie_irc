@@ -34,6 +34,13 @@ typedef struct lib_cmd_t {
 	int type; /* where type is any enum of the IRC_TYPE_* */
 } lib_cmd_t;
 
+typedef struct lib_tbl_t {
+	char *text;
+	void *objhandle;
+	int (*funcptr)(char *, int, cstr_t **);
+	int type; /* where type is any enum of the IRC_TYPE_* */
+} lib_tbl_t;
+
 enum { /* type of IRC command */
 	IRC_TYPE_CALLRESPONSE = 1,
 	IRC_TYPE_RESPONSE = 2
