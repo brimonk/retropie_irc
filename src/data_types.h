@@ -53,6 +53,7 @@ enum { /* return value to return to caller */
 	IRC_RETURN_BADPERM = 4,
 	IRC_RETURN_CMDNOSUPPORT = 5,
 
+	IRC_PARSE_ERR = INT_MAX - 1,
 	IRC_RETURN_QUIT             = INT_MAX
 };
 

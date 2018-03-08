@@ -7,8 +7,8 @@ int irc_send_pong(int sock, int arrlen, cstr_t **out);
 int irc_send_message(int sock, int arrlen, cstr_t **out);
 int irc_send_quit(int sock, int arrlen, cstr_t **out);
 
-char *get_prefix(char line[]);
-char *get_username(char line[]);
+int get_prefix(char *dest, int size, char *line);
+int get_username(char *dest, int size, char *line);
 char *get_command(char line[]);
 char *get_last_argument(char line[]);
 char *get_argument(char line[], int argno);

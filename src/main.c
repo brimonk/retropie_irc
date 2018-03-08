@@ -149,8 +149,18 @@ int main(int argc, char **argv)
 
 		fprintf(logfile, "%s\n", line);
         
-        char *prefix = get_prefix(line);
-        char *username = get_username(line);
+		if (get_prefix(str_ptr[16].buf, str_ptr[16].len, line)) {
+			fprintf(stderr, "error parsing\n");
+			continue;
+		}
+
+		if (get_username(str_ptr[17].buf, str_ptr[17].len, line)) {
+			fprintf(stderr, "error parsing username\n");
+			continue;
+		}
+
+        char *prefix = str_ptr[16].buf;
+        char *username = str_ptr[16].buf;
         char *command = get_command(line);
         char *argument = get_last_argument(line);
 
@@ -195,8 +205,6 @@ int main(int argc, char **argv)
 		cstr_clear(str_ptr, 64, BUFLEN);
 		memset(logline, 0, BUFLEN);
 
-		if (prefix) { free(prefix); }
-        if (username) { free(username); }
         if (command) { free(command); }
         if (argument) { free(argument); }
     }

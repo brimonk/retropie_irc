@@ -19,6 +19,7 @@
 #include "irc.h"
 #include "helpers.h"
 
+/* these irc functions are for sending things across the wire */
 int irc_set_nick(int sock, int arrlen, cstr_t **out)
 {
     char nick_packet[512];
@@ -83,13 +84,22 @@ int irc_send_quit(int sock, int arrlen, cstr_t **out)
 
 }
 
+/* routines specific for the PRIVMSG command */
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 {
 	int lib_return;
+
 	lib_return = 0;
 
-	char *prefix = get_prefix(input);
-	char *username = get_username(input);
+	if (get_prefix(str[32].buf, str[32].len, input)) {
+		return IRC_PARSE_ERR;
+	}
+
+	if (get_username(str[33].buf, str[33].len, input)) {
+		return IRC_PARSE_ERR;
+	}
+
+	char *username = str[33].buf;
 	char *command = get_command(input);
 	char *argument = get_one_arg(input);
 	char *full_list = get_argument_arguments(input);
@@ -118,8 +128,6 @@ int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 
 	irc_privmsg_respond(socket, lib_return, str);
 
-	free(prefix);
-	free(username);
 	free(command);
 	free(argument);
 	free(channel);
@@ -188,41 +196,60 @@ void irc_privmsg_respond(int socket, int irc_returnval, cstr_t *buf)
 	}
 }
 
-/* WARNING :: these parsing methods aren't clean TODO :: fix these */
-char *get_prefix(char line[])
+/* 
+ * TODO :: change these parsing routines to not have the following:
+ *
+ * 1. remove calls to malloc - have destination buffers with an associated size
+ */
+int get_prefix(char *dest, int size, char *line)
 {
-    char *prefix = malloc(512);
+	char *splitted;
     char clone[512];
+
+	if (512 < size) {
+		return 1;
+	}
+
     strncpy(clone, line, strlen(line)+1);
-    if (line[0] == ':'){
-        char *splitted = strtok(clone, " ");
+
+    if (line[0] == ':') {
+        splitted = strtok(clone, " ");
+
         if (splitted != NULL){
-            strncpy(prefix, splitted+1, strlen(splitted)+1);
-        }else{
-            prefix[0] = '\0';
+            strncpy(dest, splitted + 1, strlen(splitted)+1);
+        } else {
+            dest[0] = '\0';
         }
-    }else{
-        prefix[0] = '\0';
+    } else {
+        dest[0] = '\0';
     }
-    return prefix;
+
+	return 0;
 }
 
-char *get_username(char line[])
+int get_username(char *dest, int size, char *line)
 {
-    char *username = malloc(512);
+	char *splitted;
     char clone[512];
+
+	if (512 < size) {
+		return 1;
+	}
+
     strncpy(clone, line, strlen(line)+1);
-    if (strchr(clone, '!') != NULL){
-        char *splitted = strtok(clone, "!");
-        if (splitted != NULL){
-            strncpy(username, splitted+1, strlen(splitted)+1);
-        }else{
-            username[0] = '\0';
+
+    if (strchr(clone, '!') != NULL) {
+        splitted = strtok(clone, "!");
+        if (splitted != NULL) {
+            strncpy(dest, splitted + 1, strlen(splitted) + 1);
+        } else {
+            dest[0] = '\0';
         }
-    }else{
-        username[0] = '\0';
+    } else {
+        dest[0] = '\0';
     }
-    return username;
+
+    return 0;
 }
 
 char *get_command(char line[])
