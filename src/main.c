@@ -106,6 +106,7 @@ int main(int argc, char **argv)
 
 	/* before an irc connection, we load up our shared object functionality */
 	lib_num = load_irc_lib(LIBRARY_DIR, &list_ptr);
+	printf("Library Number: %d\n", lib_num);
 
 	socket_desc = mk_socket(config_ptr, config_items);
 	socket_ptr = &socket_desc;
@@ -159,54 +160,63 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-        char *prefix = str_ptr[16].buf;
-        char *username = str_ptr[16].buf;
-        char *command = get_command(line);
-        char *argument = get_last_argument(line);
+		if (get_command(str_ptr[18].buf, str_ptr[18].len, line)) {
+			fprintf(stderr, "error parsing command\n");
+			continue;
+		}
 
-        if (strcmp(command, "PING") == 0){
+		if (get_last_argument(str_ptr[19].buf, str_ptr[19].len, line)) {
+			fprintf(stderr, "error parsing argument\n");
+			continue;
+		}
+
+        char *username = str_ptr[17].buf;
+        char *command = str_ptr[18].buf;
+        char *argument = str_ptr[19].buf;
+
+        if (strcmp(command, "PING") == 0) {
 			strncpy(str_ptr[0].buf, argument, 512);
             irc_send_pong(socket_desc, 5, &str_ptr);
 			sprintf(logline, "Got ping. Replying with pong...");
 			log_to_file(logline, logfile);
-        } else if (strcmp(command, "PRIVMSG") == 0){
-            char *channel = get_argument(line, 1);
+        } else {
+			if (get_argument(str_ptr[20].buf, str_ptr[20].len, line, 1)) {
+				fprintf(stderr, "error parsing channel\n");
+				continue;
+			}
 
-            sprintf(logline, "%s/%s: %s", channel, username, argument);
-			log_to_file(logline, logfile);
+			char *channel = str_ptr[20].buf;
 
-			/* meat and potatoes */
-			irc_status = irc_privmsg(socket_desc, line, list_ptr, str_ptr); 
+			if (strcmp(command, "PRIVMSG") == 0) {
 
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        } else if (strcmp(command, "JOIN") == 0){
-            char *channel = get_argument(line, 1);
-            sprintf(logline, "%s joined %s.", username, channel);
-			log_to_file(logline, logfile);
-            
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        } else if (strcmp(command, "PART") == 0){
-            char *channel = get_argument(line, 1);
-            sprintf(logline, "%s left %s.", username, channel);
-			log_to_file(logline, logfile);
-            
-            sprintf(filename, "%s.log.txt", channel);
-            freopen(filename, "a+", logfile);
-            log_to_file(logline, logfile);
-            free(channel);
-        }
+				sprintf(logline, "%s/%s: %s", channel, username, argument);
+				log_to_file(logline, logfile);
+
+				/* meat and potatoes */
+				irc_status = irc_privmsg(socket_desc, line, list_ptr, str_ptr); 
+
+				sprintf(filename, "%s.log.txt", channel);
+				freopen(filename, "a+", logfile);
+				log_to_file(logline, logfile);
+			} else if (strcmp(command, "JOIN") == 0) {
+				sprintf(logline, "%s joined %s.", username, channel);
+				log_to_file(logline, logfile);
+				
+				sprintf(filename, "%s.log.txt", channel);
+				freopen(filename, "a+", logfile);
+				log_to_file(logline, logfile);
+			} else if (strcmp(command, "PART") == 0) {
+				sprintf(logline, "%s left %s.", username, channel);
+				log_to_file(logline, logfile);
+				
+				sprintf(filename, "%s.log.txt", channel);
+				freopen(filename, "a+", logfile);
+				log_to_file(logline, logfile);
+			}
+		}
 
 		cstr_clear(str_ptr, 64, BUFLEN);
 		memset(logline, 0, BUFLEN);
-
-        if (command) { free(command); }
-        if (argument) { free(argument); }
     }
 
 	/* quit irc */

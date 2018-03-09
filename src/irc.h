@@ -9,11 +9,11 @@ int irc_send_quit(int sock, int arrlen, cstr_t **out);
 
 int get_prefix(char *dest, int size, char *line);
 int get_username(char *dest, int size, char *line);
-char *get_command(char line[]);
-char *get_last_argument(char line[]);
-char *get_argument(char line[], int argno);
-char *get_argument_arguments(char *beginning);
-char *get_one_arg(char *input);
+int get_command(char *dest, int size, char *line);
+int get_last_argument(char *dest, int size, char *line);
+int get_argument(char *dest, int size, char *line, int argno);
+int get_argument_arguments(char *dest, int size, char *input);
+int get_one_arg(char *dest, int size, char *input);
 
 /* irc_privmsg specifics */
 int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str);

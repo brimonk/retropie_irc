@@ -91,46 +91,49 @@ int irc_privmsg(int socket, char *input, list_t *ptr, cstr_t *str)
 
 	lib_return = 0;
 
+	if (get_argument(str[0].buf, str[0].len, input, 1)) {
+		return IRC_PARSE_ERR;
+	}
+
+	if (get_username(str[1].buf, str[1].len, input)) {
+		return IRC_PARSE_ERR;
+	}
+
+	if (get_one_arg(str[2].buf, str[2].len, input)) {
+		return IRC_PARSE_ERR;
+	}
+
+	if (get_argument_arguments(str[3].buf, str[3].len, input)) {
+		return IRC_PARSE_ERR;
+	}
+
 	if (get_prefix(str[32].buf, str[32].len, input)) {
 		return IRC_PARSE_ERR;
 	}
 
-	if (get_username(str[33].buf, str[33].len, input)) {
+	// if (get_command(str[34].buf, str[34].len, input)) {
+	// 	return IRC_PARSE_ERR;
+	// }
+
+	if (get_last_argument(str[35].buf, str[35].len, input)) {
 		return IRC_PARSE_ERR;
 	}
 
-	char *username = str[33].buf;
-	char *command = get_command(input);
-	char *argument = get_one_arg(input);
-	char *full_list = get_argument_arguments(input);
-	char *channel = get_argument(input, 1);
-
 	/* spend some time setting up our cstr_t values */
-	strncpy(str[0].buf, channel, BUFLEN);
-	strncpy(str[1].buf, username, BUFLEN);
-	if (argument) {
-		strncpy(str[2].buf, argument, BUFLEN);
-	}
-	strncpy(str[3].buf, full_list, BUFLEN);
 
 	lib_return = irc_privmsg_namedfunc(&str[8], ptr, str);
 	if (!lib_return) {
-		free(argument);
-		argument = get_last_argument(input);
-		strncpy(str[3].buf, argument, BUFLEN);
 		lib_return = irc_privmsg_unnamedfunc(&str[8], ptr, str);
 	}
 
 	/* provide the properly formatted cstr_t and the return value */
-	strncpy(str[0].buf, channel, BUFLEN);
+	if (get_argument(str[0].buf, str[0].len, input, 1)) {
+		return IRC_PARSE_ERR;
+	}
 	strncpy(str[1].buf, str[8].buf, BUFLEN - strlen(str[8].buf));
 	strncat(str[1].buf, "\r\n", BUFLEN - strlen(str[8].buf));
 
 	irc_privmsg_respond(socket, lib_return, str);
-
-	free(command);
-	free(argument);
-	free(channel);
 
 	return lib_return;
 }
@@ -252,15 +255,15 @@ int get_username(char *dest, int size, char *line)
     return 0;
 }
 
-char *get_command(char line[])
+int get_command(char *dest, int size, char *line)
 {
-    char *command = malloc(512);
+	char *splitted;
     char clone[512];
     strncpy(clone, line, strlen(line)+1);
-    char *splitted = strtok(clone, " ");
+    splitted = strtok(clone, " ");
 
-	if (!command) {
-		return NULL;
+	if (512 < size) {
+		return 1;
 	}
 
     if (splitted != NULL){
@@ -268,93 +271,116 @@ char *get_command(char line[])
             splitted = strtok(NULL, " ");
         }
         if (splitted != NULL){
-            strncpy(command, splitted, strlen(splitted)+1);
+            strncpy(dest, splitted, strlen(splitted)+1);
         }else{
-            command[0] = '\0';
+            dest[0] = '\0';
         }
     }else{
-        command[0] = '\0';
+        dest[0] = '\0';
     }
 
-    return command;
+    return 0;
 }
 
-char *get_last_argument(char line[])
+int get_last_argument(char *dest, int size, char *line)
 {
-    char *argument = malloc(512);
+	char *splitted;
     char clone[512];
-    strncpy(clone, line, strlen(line)+1);
-    char *splitted = strstr(clone, " :");
-    if (splitted != NULL){
-        strncpy(argument, splitted+2, strlen(splitted)+1);
-    }else{
-        argument[0] = '\0';
+
+	if (512 < size) {
+		return 1;
+	}
+
+    strncpy(clone, line, strlen(line) + 1);
+
+    splitted = strstr(clone, " :");
+
+    if (splitted != NULL) {
+        strncpy(dest, splitted + 2, strlen(splitted) + 1);
+    } else {
+        dest[0] = '\0';
     }
-    return argument;
+
+	return 0;
 }
 
-char *get_argument(char line[], int argno)
+int get_argument(char *dest, int size, char *line, int argno)
 {
-    char *argument = malloc(512);
     char clone[512];
+
+	if (512 < size) {
+		return 1;
+	}
+
     strncpy(clone, line, strlen(line)+1);
     
     int current_arg = 0;
     char *splitted = strtok(clone, " ");
-    while (splitted != NULL){
-        if (splitted[0] != ':'){
+
+    while (splitted != NULL) {
+        if (splitted[0] != ':') {
             current_arg++;
         }
-        if (current_arg == argno+1){
-            strncpy(argument, splitted, strlen(splitted)+1);
-            return argument;
+
+        if (current_arg == argno+1) {
+            strncpy(dest, splitted, strlen(splitted)+1);
+			return 0;
         }
+
         splitted = strtok(NULL, " ");
     }
     
     if (current_arg != argno){
-        argument[0] = '\0';
+        dest[0] = '\0';
     }
-    return argument;
+
+    return 0;
 }
 
-char *get_argument_arguments(char *input)
+int get_argument_arguments(char *dest, int size, char *input)
 {
 	/* returns a pointer to the next word after line */
-	int i;
 	char *curr;
 
-	curr = strrchr(input, ':');
-	for (i = 0; i < strlen(curr); i++) {
-		if (curr[i] == ' ') {
-			i++;
-			break;
-		}
+	curr = strstr(input, " :");
+	if (curr) {
+		curr += 2;
+		strncpy(dest, curr, strlen(curr) + 1);
 	}
 
-	return curr + i;
+	return 0;
 }
 
-char *get_one_arg(char *input)
+int get_one_arg(char *dest, int size, char *input)
 {
-	char *val = malloc(BUFLEN);
-    char *splitted = strstr(input, " :");
+	char *splitted;
+	char clone[512];
+
+	if (512 < size) {
+		return 1;
+	}
+
+    splitted = strstr(input, " :");
 	splitted += 2;
 
     if (splitted != NULL){
 		char *tmp = strchr(splitted, ' ');
 
 		if (tmp != NULL) {
-			strncpy(val, splitted, tmp - splitted);
-			*(val + (tmp - splitted)) = 0;
+			strncpy(clone, splitted, tmp - splitted);
+			*(clone + (tmp - splitted)) = 0;
 		} else { /* one argument command */
-			strncpy(val, splitted, strlen(splitted));
-			val[strlen(splitted)] = 0;
+			strncpy(clone, splitted, strlen(splitted));
+			clone[strlen(splitted)] = 0;
 		}
 
-    }else{
-		val = NULL;
+    } else {
+		dest = NULL;
     }
 
-    return val;
+	if (strlen(clone) > 0) {
+		strncpy(dest, clone, strlen(clone));
+	}
+
+    return 0;
 }
